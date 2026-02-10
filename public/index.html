@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Love Board Remote</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Fraunces:opsz,wght@9..144,500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="bg-orb orb-a"></div>
+    <div class="bg-orb orb-b"></div>
+
+    <main class="app-shell">
+      <header class="hero fade-in">
+        <div>
+          <p class="kicker">Remote LED Matrix Control</p>
+          <h1>Love Board Remote</h1>
+          <p class="subline">Manage widgets, full-board messages, animations, and pixel art for your 64x32 display.</p>
+        </div>
+        <div class="hero-actions">
+          <button id="save-all" class="btn btn-primary">Save All Settings</button>
+          <button id="stop-board" class="btn btn-ghost">Stop Board</button>
+        </div>
+      </header>
+
+      <section class="status-row fade-in delay-1">
+        <div id="status-pill" class="status-pill">Loading...</div>
+        <div id="status-text" class="status-text">Connecting to local server...</div>
+      </section>
+
+      <section class="layout fade-in delay-2">
+        <aside class="panel stack">
+          <article class="card">
+            <h2>Pi Connection</h2>
+            <p class="card-help">Connect to your Raspberry Pi and install/update the renderer script.</p>
+
+            <div class="field-grid">
+              <label>
+                <span>Hostname</span>
+                <input id="pi-host" type="text" placeholder="lrdigiboard" />
+              </label>
+              <label>
+                <span>Port</span>
+                <input id="pi-port" type="number" placeholder="22" />
+              </label>
+              <label>
+                <span>Username</span>
+                <input id="pi-user" type="text" placeholder="lydarose" />
+              </label>
+              <label>
+                <span>Password</span>
+                <input id="pi-pass" type="password" placeholder="Enter Pi password" />
+              </label>
+            </div>
+
+            <label>
+              <span>Remote Script Path</span>
+              <input id="pi-script-path" type="text" placeholder="/home/lydarose/remote_display.py" />
+            </label>
+
+            <label>
+              <span>Python Command</span>
+              <input id="pi-python" type="text" placeholder="python3" />
+            </label>
+
+            <label class="checkbox">
+              <input id="pi-sudo" type="checkbox" />
+              <span>Run renderer with sudo</span>
+            </label>
+
+            <div class="button-row">
+              <button id="test-connection" class="btn btn-secondary">Test Connection</button>
+              <button id="install-script" class="btn btn-secondary">Install Pi Script</button>
+            </div>
+          </article>
+
+          <article class="card">
+            <h2>Global Board Settings</h2>
+            <label>
+              <span>Brightness <strong id="brightness-value">70</strong>%</span>
+              <input id="brightness" type="range" min="10" max="100" step="1" value="70" />
+            </label>
+            <p class="card-help">Applies to all modes (widgets, message, animation, pixel art).</p>
+          </article>
+        </aside>
+
+        <section class="panel stack main-panel">
+          <article class="card preview-card">
+            <div class="preview-head">
+              <h2>Board Preview</h2>
+              <button id="push-active" class="btn btn-primary">Show Current Tab on Board</button>
+            </div>
+            <canvas id="preview-canvas" width="640" height="320" aria-label="LED matrix preview"></canvas>
+          </article>
+
+          <article class="card">
+            <div class="tabs">
+              <button class="tab is-active" data-tab="widgets">Widgets</button>
+              <button class="tab" data-tab="message">Full Message</button>
+              <button class="tab" data-tab="animation">Animation</button>
+              <button class="tab" data-tab="pixels">Pixel Painter</button>
+            </div>
+
+            <section id="tab-widgets" class="tab-panel is-active">
+              <h3>Widget Dashboard</h3>
+              <p class="card-help">Mix weather, calendar, todo, and note widgets in a compact board layout.</p>
+
+              <div class="widget-grid">
+                <article class="mini-card">
+                  <div class="mini-head">
+                    <h4>Weather</h4>
+                    <label class="checkbox inline"><input id="weather-enabled" type="checkbox" /> Enabled</label>
+                  </div>
+                  <label>
+                    <span>City</span>
+                    <input id="weather-city" type="text" placeholder="Los Angeles" />
+                  </label>
+                  <label>
+                    <span>Unit</span>
+                    <select id="weather-unit">
+                      <option value="F">Fahrenheit</option>
+                      <option value="C">Celsius</option>
+                    </select>
+                  </label>
+                  <button id="refresh-weather" class="btn btn-ghost">Preview Weather</button>
+                  <p id="weather-preview" class="hint"></p>
+                </article>
+
+                <article class="mini-card">
+                  <div class="mini-head">
+                    <h4>Calendar</h4>
+                    <label class="checkbox inline"><input id="calendar-enabled" type="checkbox" /> Enabled</label>
+                  </div>
+                  <div id="calendar-events" class="list-stack"></div>
+                  <button id="add-event" class="btn btn-ghost">Add Event</button>
+                </article>
+
+                <article class="mini-card">
+                  <div class="mini-head">
+                    <h4>To-do List</h4>
+                    <label class="checkbox inline"><input id="todo-enabled" type="checkbox" /> Enabled</label>
+                  </div>
+                  <div id="todo-items" class="list-stack"></div>
+                  <button id="add-todo" class="btn btn-ghost">Add To-do</button>
+                </article>
+
+                <article class="mini-card">
+                  <div class="mini-head">
+                    <h4>Small Message</h4>
+                    <label class="checkbox inline"><input id="note-enabled" type="checkbox" /> Enabled</label>
+                  </div>
+                  <label>
+                    <span>Message</span>
+                    <textarea id="note-text" rows="3" placeholder="Love you forever!"></textarea>
+                  </label>
+                </article>
+              </div>
+            </section>
+
+            <section id="tab-message" class="tab-panel">
+              <h3>Full Board Message</h3>
+              <p class="card-help">Show one big message with animation effects.</p>
+
+              <label>
+                <span>Message</span>
+                <textarea id="message-text" rows="3" placeholder="Type your message here"></textarea>
+              </label>
+
+              <div class="field-grid">
+                <label>
+                  <span>Color</span>
+                  <input id="message-color" type="color" />
+                </label>
+                <label>
+                  <span>Effect</span>
+                  <select id="message-effect">
+                    <option value="scroll">Scroll</option>
+                    <option value="pulse">Pulse</option>
+                    <option value="static">Static</option>
+                  </select>
+                </label>
+              </div>
+
+              <label>
+                <span>Speed <strong id="message-speed-value">35</strong></span>
+                <input id="message-speed" type="range" min="10" max="100" value="35" />
+              </label>
+            </section>
+
+            <section id="tab-animation" class="tab-panel">
+              <h3>Animation Mode</h3>
+              <p class="card-help">Play colorful full-board effects.</p>
+
+              <label>
+                <span>Preset</span>
+                <select id="animation-preset">
+                  <option value="rainbowWave">Rainbow Wave</option>
+                  <option value="heartBeat">Heart Beat</option>
+                  <option value="sparkles">Sparkles</option>
+                  <option value="colorWipe">Color Wipe</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Speed <strong id="animation-speed-value">35</strong></span>
+                <input id="animation-speed" type="range" min="10" max="100" value="35" />
+              </label>
+            </section>
+
+            <section id="tab-pixels" class="tab-panel">
+              <h3>Pixel Painter (64x32)</h3>
+              <p class="card-help">Draw exactly what should appear on the board.</p>
+
+              <div class="pixel-tools">
+                <label>
+                  <span>Paint Color</span>
+                  <input id="pixel-color" type="color" value="#ff3b30" />
+                </label>
+                <button id="pixel-erase" class="btn btn-ghost">Eraser</button>
+                <button id="pixel-clear" class="btn btn-ghost">Clear</button>
+                <button id="pixel-fill" class="btn btn-ghost">Fill</button>
+              </div>
+
+              <canvas id="pixel-canvas" width="640" height="320" aria-label="Pixel painter canvas"></canvas>
+            </section>
+          </article>
+        </section>
+      </section>
+    </main>
+
+    <template id="calendar-event-template">
+      <div class="list-row calendar-row">
+        <input type="date" data-role="date" />
+        <input type="time" data-role="time" />
+        <input type="text" data-role="title" placeholder="Event title" maxlength="40" />
+        <button data-role="remove" class="btn btn-danger">Remove</button>
+      </div>
+    </template>
+
+    <template id="todo-item-template">
+      <div class="list-row todo-row">
+        <label class="checkbox inline"><input type="checkbox" data-role="done" /> Done</label>
+        <input type="text" data-role="text" placeholder="To-do item" maxlength="50" />
+        <button data-role="remove" class="btn btn-danger">Remove</button>
+      </div>
+    </template>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
