@@ -112,6 +112,8 @@ cd ~/Valentines
 bash pi/setup_pretty_url.sh 3000 loveboard
 ```
 
+This now also publishes an mDNS alias (`loveboard.local`) so the pretty URL can work even if your Pi hostname is still `lrdigiboard`.
+
 3. Open from phone:
 
 ```text
@@ -198,6 +200,8 @@ sudo systemctl restart love-board
 - Pretty URL not loading:
   - Check `sudo systemctl status nginx`.
   - Check `sudo nginx -t`.
+  - Re-run `bash pi/setup_pretty_url.sh 3000 loveboard` to refresh the mDNS alias.
+  - Check mDNS name from Pi: `avahi-resolve -n loveboard.local`.
   - Ensure phone and Pi are on the same Wi-Fi.
 
 ## API Endpoints
