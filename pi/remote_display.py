@@ -300,18 +300,24 @@ def draw_weather_icon(canvas, x, y, icon_name):
     if icon == 'sun':
         color = (255, 206, 40)
         pattern = ['00100', '10101', '01110', '10101', '00100']
+    elif icon == 'moon':
+        color = (230, 230, 255)
+        pattern = ['01110', '11000', '11000', '11000', '01110']
     elif icon == 'rain':
         color = (60, 170, 255)
-        pattern = ['01110', '11111', '00100', '01010', '10001']
+        pattern = ['01110', '11111', '11111', '01010', '10101']
     elif icon == 'storm':
         color = (255, 180, 40)
-        pattern = ['01110', '11111', '00100', '01100', '00110']
+        pattern = ['01110', '11111', '00100', '01100', '11000']
     elif icon == 'snow':
         color = (230, 245, 255)
-        pattern = ['10101', '01010', '10101', '01010', '10101']
+        pattern = ['10101', '01110', '10101', '01110', '10101']
     elif icon == 'fog':
         color = (185, 210, 220)
         pattern = ['00000', '11111', '00000', '11111', '00000']
+    elif icon == 'cloud':
+        color = (190, 210, 235)
+        pattern = ['00000', '01110', '11111', '11111', '01110']
     else:
         color = (180, 210, 240)
         pattern = ['00000', '01110', '11111', '01110', '00000']
@@ -403,7 +409,7 @@ def run_widgets(matrix, payload):
         clock_text = f"{time_text} {date_text}"
         clock_x = 1
         draw_text_compact(canvas, clock_x, 1, clock_text, (255, 242, 194))
-        weather_x = clock_x + compact_text_width(clock_text) + 1
+        clock_end = clock_x + compact_text_width(clock_text) + 2
 
         if note.get('enabled', True):
             daily_note = pick_daily_note(note.get('catalog', []))
@@ -419,30 +425,41 @@ def run_widgets(matrix, payload):
         if weather.get('enabled', True):
             temp_value = str(weather.get('temp', '--')).strip()
             unit_value = str(weather.get('unit', 'F')).strip()
-            temp_text = fit_text(f"{temp_value}{unit_value}", 4)
-            temp_text_no_unit = fit_text(temp_value, 3)
-            draw_temp_text = temp_text
-            icon_x = weather_x + compact_text_width(draw_temp_text) + 1
+            temp_text_full = fit_text(f"{temp_value}{unit_value}", 4)
+            temp_text_short = fit_text(temp_value, 3)
+            draw_temp_text = temp_text_full
+            icon_name = str(weather.get('icon', 'cloud') or 'cloud')
+            if icon_name.lower() == 'sun' and (now.hour < 6 or now.hour >= 18):
+                icon_name = 'moon'
 
             icon_width = 5
-            if icon_x + icon_width >= note_x and note.get('enabled', True) and len(note_text) > 3:
+            gap = 2
+            weather_x = note_x - (compact_text_width(draw_temp_text) + 1 + icon_width) - gap
+
+            if weather_x < clock_end and note.get('enabled', True) and len(note_text) > 3:
                 note_text = fit_text(daily_note, 3)
                 note_width = compact_text_width(note_text)
                 note_x = matrix.width - note_width - 1
+                weather_x = note_x - (compact_text_width(draw_temp_text) + 1 + icon_width) - gap
 
-            if icon_x + icon_width >= note_x:
-                draw_temp_text = temp_text_no_unit
-                icon_x = weather_x + compact_text_width(draw_temp_text) + 1
+            if weather_x < clock_end:
+                draw_temp_text = temp_text_short
+                weather_x = note_x - (compact_text_width(draw_temp_text) + 1 + icon_width) - gap
 
-            if icon_x + icon_width >= note_x and note.get('enabled', True) and len(note_text) > 2:
+            if weather_x < clock_end and note.get('enabled', True) and len(note_text) > 2:
                 note_text = fit_text(daily_note, 2)
                 note_width = compact_text_width(note_text)
                 note_x = matrix.width - note_width - 1
+                weather_x = note_x - (compact_text_width(draw_temp_text) + 1 + icon_width) - gap
 
+            if weather_x < clock_end:
+                weather_x = clock_end
+
+            icon_x = weather_x + compact_text_width(draw_temp_text) + 1
             draw_text_compact(canvas, weather_x, 1, draw_temp_text, (155, 236, 255))
-            draw_weather_icon(canvas, icon_x, 1, weather.get('icon', 'cloud'))
+            draw_weather_icon(canvas, icon_x, 1, icon_name)
         else:
-            draw_text_compact(canvas, weather_x, 1, 'OFF', muted_color)
+            draw_text_compact(canvas, clock_end, 1, 'OFF', muted_color)
 
         # Top-right: short daily note rotated from catalog
         draw_text_compact(canvas, note_x, 1, note_text, note_color)

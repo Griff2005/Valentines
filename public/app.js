@@ -180,6 +180,32 @@ function bulletPreviewSymbol(style) {
   return '•';
 }
 
+function weatherIconSymbol(icon) {
+  const name = String(icon || '').toLowerCase();
+  if (name === 'sun') {
+    return '☀';
+  }
+  if (name === 'moon') {
+    return '☾';
+  }
+  if (name === 'cloud') {
+    return '☁';
+  }
+  if (name === 'rain') {
+    return '☔';
+  }
+  if (name === 'snow') {
+    return '❄';
+  }
+  if (name === 'fog') {
+    return '〰';
+  }
+  if (name === 'storm') {
+    return '⚡';
+  }
+  return '';
+}
+
 function sortCalendarEvents(events) {
   return [...events].sort((a, b) => {
     const left = `${a.date || ''}T${a.time || '00:00'}`;
@@ -324,7 +350,7 @@ function populateFormFromState() {
   ids.weatherCity.value = widgets.weather.city || '';
   ids.weatherUnit.value = widgets.weather.unit || 'F';
   const tempLabel = widgets.weather.temp ? `${widgets.weather.temp}${widgets.weather.unit || ''}` : '';
-  const iconLabel = widgets.weather.icon ? widgets.weather.icon : '';
+  const iconLabel = weatherIconSymbol(widgets.weather.icon);
   ids.weatherPreview.textContent = tempLabel ? `${tempLabel} ${iconLabel}`.trim() : '';
 
   ids.calendarEnabled.checked = Boolean(widgets.calendar.enabled);
@@ -464,7 +490,12 @@ function drawWidgetPreview(width, height) {
       : dayEvents;
   const dailyNote = widgets.note.enabled ? getDailyNote(widgets.note.catalog || []) : 'OFF';
   const weatherTemp = widgets.weather.temp ? `${widgets.weather.temp}${widgets.weather.unit || ''}`.trim() : '--';
-  const weatherIcon = widgets.weather.icon ? widgets.weather.icon : '';
+  const isNight = now.getHours() < 6 || now.getHours() >= 18;
+  const iconName =
+    isNight && String(widgets.weather.icon || '').toLowerCase() === 'sun'
+      ? 'moon'
+      : widgets.weather.icon;
+  const weatherIcon = weatherIconSymbol(iconName);
   const weatherText = widgets.weather.enabled ? `${weatherTemp} ${weatherIcon}`.trim() : 'OFF';
 
   previewCtx.strokeStyle = 'rgba(255,255,255,0.18)';
@@ -730,7 +761,7 @@ function registerEvents() {
         })
       });
 
-      const summary = `${weather.temp}${weather.unit} ${weather.icon}`.trim();
+      const summary = `${weather.temp}${weather.unit} ${weatherIconSymbol(weather.icon)}`.trim();
       ids.weatherPreview.textContent = summary;
       appState.board.widgets.weather.summary = weather.summary;
       appState.board.widgets.weather.icon = weather.icon;
