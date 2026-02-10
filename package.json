@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "check": "node --check server.js && node --check services/stateStore.js && node --check services/payloadBuilder.js && node --check services/piClient.js && node --check services/weatherService.js"
+    "check": "node --check server.js && node --check services/stateStore.js && node --check services/payloadBuilder.js && node --check services/piClient.js && node --check services/weatherService.js && node --check services/calendarService.js"
   },
   "keywords": [
     "raspberry-pi",

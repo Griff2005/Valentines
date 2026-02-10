@@ -13,6 +13,7 @@ import random
 import signal
 import sys
 import time
+from datetime import date, datetime
 
 from rgbmatrix import RGBMatrix, RGBMatrixOptions  # type: ignore
 
@@ -268,6 +269,91 @@ def draw_box_text(canvas, x, y, width, height, title, lines, title_color, text_c
             printed += 1
 
 
+def fit_text(value, max_chars):
+    text = str(value or '').strip()
+    if not text:
+        return ''
+    return text[:max_chars]
+
+
+def pick_daily_note(catalog):
+    notes = [str(note or '').strip() for note in catalog if str(note or '').strip()]
+    if not notes:
+        return ''
+    return notes[date.today().toordinal() % len(notes)]
+
+
+def draw_weather_icon(canvas, x, y, icon_name):
+    icon = str(icon_name or 'cloud').lower()
+
+    if icon == 'sun':
+        color = (255, 206, 40)
+        pattern = ['00100', '10101', '01110', '10101', '00100']
+    elif icon == 'rain':
+        color = (60, 170, 255)
+        pattern = ['01110', '11111', '00100', '01010', '10001']
+    elif icon == 'storm':
+        color = (255, 180, 40)
+        pattern = ['01110', '11111', '00100', '01100', '00110']
+    elif icon == 'snow':
+        color = (230, 245, 255)
+        pattern = ['10101', '01010', '10101', '01010', '10101']
+    elif icon == 'fog':
+        color = (185, 210, 220)
+        pattern = ['00000', '11111', '00000', '11111', '00000']
+    else:
+        color = (180, 210, 240)
+        pattern = ['00000', '01110', '11111', '01110', '00000']
+
+    for row_index, row in enumerate(pattern):
+        for col_index, bit in enumerate(row):
+            if bit == '1':
+                draw_pixel(canvas, x + col_index, y + row_index, color)
+
+
+def draw_todo_bullet(canvas, x, y, style):
+    bullet_style = str(style or 'dot').lower()
+    color = (255, 120, 120)
+
+    if bullet_style == 'heart':
+        pattern = ['01010', '11111', '11111', '01110', '00100']
+    elif bullet_style == 'star':
+        pattern = ['00100', '10101', '01110', '10101', '00100']
+    elif bullet_style == 'diamond':
+        pattern = ['00100', '01110', '11111', '01110', '00100']
+    else:
+        pattern = ['00000', '00100', '01110', '00100', '00000']
+
+    for row_index, row in enumerate(pattern):
+        for col_index, bit in enumerate(row):
+            if bit == '1':
+                draw_pixel(canvas, x + col_index, y + row_index, color)
+
+
+def format_event_time(value):
+    text = str(value or '').strip()
+    if len(text) >= 5 and text[2] == ':':
+        return text[:5]
+    return '00:00'
+
+
+def todays_events(events):
+    today = datetime.now().strftime('%Y-%m-%d')
+    valid = []
+
+    for event in events:
+        if str(event.get('date') or '').strip() != today:
+            continue
+
+        valid.append({
+            'time': format_event_time(event.get('time')),
+            'title': str(event.get('title') or '').strip()
+        })
+
+    valid.sort(key=lambda item: item['time'])
+    return valid
+
+
 def run_widgets(matrix, payload):
     widgets = payload.get('widgets', {})
     weather = widgets.get('weather', {})
@@ -275,37 +361,68 @@ def run_widgets(matrix, payload):
     todo = widgets.get('todo', {})
     note = widgets.get('note', {})
 
-    border = (24, 70, 70)
-    title_color = (255, 196, 0)
-    text_color = (210, 240, 255)
+    border = (40, 96, 118)
+    title_color = (255, 210, 100)
+    text_color = (214, 235, 255)
+    muted_color = (130, 150, 166)
 
     canvas = matrix.CreateFrameCanvas()
 
     while RUNNING:
         clear(canvas)
 
-        draw_box(canvas, 0, 0, 31, 15, border)
-        draw_box(canvas, 32, 0, 63, 15, border)
-        draw_box(canvas, 0, 16, 31, 31, border)
-        draw_box(canvas, 32, 16, 63, 31, border)
+        draw_hline(canvas, 0, matrix.width - 1, 7, border)
+        draw_vline(canvas, 31, 8, matrix.height - 1, border)
 
-        weather_lines = []
+        # Top-left: live time + weather
+        time_text = datetime.now().strftime('%H:%M')
+        draw_text(canvas, 1, 1, time_text, (255, 242, 194))
+
         if weather.get('enabled', True):
-            if weather.get('city'):
-                weather_lines.append(str(weather.get('city')))
-            if weather.get('text'):
-                weather_lines.append(str(weather.get('text')))
+            temp_text = fit_text(f"{weather.get('temp', '--')}{weather.get('unit', 'F')}", 4)
+            draw_text(canvas, 22, 1, temp_text, (155, 236, 255))
+            draw_weather_icon(canvas, 39, 1, weather.get('icon', 'cloud'))
         else:
-            weather_lines = ['OFF']
+            draw_text(canvas, 22, 1, 'OFF', muted_color)
 
-        cal_lines = calendar.get('lines', []) if calendar.get('enabled', True) else ['OFF']
-        todo_lines = todo.get('lines', []) if todo.get('enabled', True) else ['OFF']
-        note_lines = [str(note.get('text') or '')] if note.get('enabled', True) else ['OFF']
+        # Top-right: short daily note rotated from catalog
+        if note.get('enabled', True):
+            daily_note = pick_daily_note(note.get('catalog', []))
+            draw_text(canvas, 47, 1, fit_text(daily_note, 4), (255, 195, 143))
+        else:
+            draw_text(canvas, 47, 1, 'OFF', muted_color)
 
-        draw_box_text(canvas, 0, 0, 32, 16, 'WEA', weather_lines, title_color, text_color)
-        draw_box_text(canvas, 32, 0, 32, 16, 'CAL', cal_lines, title_color, text_color)
-        draw_box_text(canvas, 0, 16, 32, 16, 'TODO', todo_lines, title_color, text_color)
-        draw_box_text(canvas, 32, 16, 32, 16, 'NOTE', note_lines, title_color, text_color)
+        # Bottom-left: todo list with bullet styles
+        draw_text(canvas, 1, 9, 'TODO', title_color)
+        todo_items = todo.get('items', []) if todo.get('enabled', True) else []
+        todo_style = todo.get('bulletStyle', 'dot')
+        todo_y = 15
+
+        if not todo.get('enabled', True):
+            draw_text(canvas, 1, todo_y, 'OFF', muted_color)
+        elif not todo_items:
+            draw_text(canvas, 1, todo_y, 'NONE', muted_color)
+        else:
+            for item in todo_items[:3]:
+                draw_todo_bullet(canvas, 1, todo_y, todo_style)
+                draw_text(canvas, 7, todo_y, fit_text(item.get('text', ''), 6), text_color)
+                todo_y += 6
+
+        # Bottom-right: today's calendar events
+        draw_text(canvas, 33, 9, 'DAY', title_color)
+        day_events = todays_events(calendar.get('events', [])) if calendar.get('enabled', True) else []
+        cal_y = 15
+
+        if not calendar.get('enabled', True):
+            draw_text(canvas, 33, cal_y, 'OFF', muted_color)
+        elif not day_events:
+            draw_text(canvas, 33, cal_y, 'FREE', muted_color)
+        else:
+            for event in day_events[:3]:
+                compact_time = event['time'].replace(':', '')[:4]
+                title = fit_text(event['title'], 3)
+                draw_text(canvas, 33, cal_y, f'{compact_time}{title}', text_color)
+                cal_y += 6
 
         canvas = matrix.SwapOnVSync(canvas)
         time.sleep(0.25)

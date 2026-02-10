@@ -17,12 +17,47 @@ function sortEvents(events) {
 }
 
 function normalizeTodoItems(items) {
-  return items
+  return (Array.isArray(items) ? items : [])
     .filter((item) => typeof item.text === 'string' && item.text.trim())
     .map((item) => ({
-      text: item.text.trim(),
-      done: Boolean(item.done)
+      text: item.text.trim().slice(0, 80)
     }));
+}
+
+function normalizeCalendarEvents(events) {
+  return sortEvents(
+    (Array.isArray(events) ? events : []).map((event) => ({
+      date: String(event?.date || '').trim(),
+      time: String(event?.time || '').trim(),
+      title: String(event?.title || '').trim(),
+      location: String(event?.location || '').trim(),
+      source: String(event?.source || 'manual').trim()
+    }))
+  )
+    .filter((event) => /^\d{4}-\d{2}-\d{2}$/.test(event.date) && event.title)
+    .map((event) => ({
+      ...event,
+      time: /^\d{2}:\d{2}$/.test(event.time) ? event.time : '00:00'
+    }));
+}
+
+function normalizeNoteCatalog(catalog, fallbackText = '') {
+  const merged = [
+    ...(Array.isArray(catalog) ? catalog : []),
+    ...(fallbackText ? [fallbackText] : [])
+  ];
+
+  const normalized = merged
+    .map((note) => String(note || '').trim().slice(0, 80))
+    .filter(Boolean);
+
+  const deduped = Array.from(new Set(normalized));
+  return deduped.length ? deduped : ['Love you forever'];
+}
+
+function normalizeBulletStyle(style) {
+  const value = String(style || '').trim();
+  return ['dot', 'heart', 'star', 'diamond'].includes(value) ? value : 'dot';
 }
 
 function buildMatrixOptions(state) {
@@ -40,35 +75,37 @@ function buildMatrixOptions(state) {
 }
 
 async function buildWidgetPayload(state, getWeather) {
-  const widgets = state.board.widgets;
-  let weatherText = null;
+  const widgets = state.board.widgets || {};
+  const weatherWidget = widgets.weather || {};
+  const calendarWidget = widgets.calendar || {};
+  const todoWidget = widgets.todo || {};
+  const noteWidget = widgets.note || {};
 
-  if (widgets.weather.enabled) {
+  let weatherData = {
+    city: weatherWidget.city,
+    temp: '--',
+    unit: weatherWidget.unit || 'F',
+    summary: weatherWidget.summary || 'N/A',
+    icon: weatherWidget.icon || 'cloud'
+  };
+
+  if (weatherWidget.enabled) {
     try {
-      const weather = await getWeather({
-        city: widgets.weather.city,
-        unit: widgets.weather.unit
+      weatherData = await getWeather({
+        city: weatherWidget.city,
+        unit: weatherWidget.unit
       });
-      weatherText = `${weather.temp}${weather.unit} ${weather.summary}`;
-    } catch (error) {
-      const fallbackSummary = widgets.weather.summary || 'N/A';
-      weatherText = `--${widgets.weather.unit} ${fallbackSummary}`;
+    } catch (_error) {
+      weatherData = {
+        ...weatherData,
+        icon: weatherWidget.icon || weatherData.icon || 'cloud'
+      };
     }
   }
 
-  const events = sortEvents(widgets.calendar.events || [])
-    .slice(0, 3)
-    .map((event) => {
-      const title = (event.title || '').trim().slice(0, 12);
-      const day = (event.date || '').slice(5);
-      const time = (event.time || '').slice(0, 5);
-      return `${day} ${time} ${title}`.trim();
-    })
-    .filter(Boolean);
-
-  const todo = normalizeTodoItems(widgets.todo.items || [])
-    .slice(0, 3)
-    .map((item) => `${item.done ? '[x]' : '[ ]'} ${item.text.slice(0, 14)}`);
+  const events = normalizeCalendarEvents(calendarWidget.events);
+  const todoItems = normalizeTodoItems(todoWidget.items || []);
+  const noteCatalog = normalizeNoteCatalog(noteWidget.catalog, noteWidget.text);
 
   return {
     mode: 'widgets',
@@ -76,21 +113,26 @@ async function buildWidgetPayload(state, getWeather) {
     matrixOptions: buildMatrixOptions(state),
     widgets: {
       weather: {
-        enabled: Boolean(widgets.weather.enabled),
-        city: widgets.weather.city,
-        text: weatherText
+        enabled: Boolean(weatherWidget.enabled),
+        city: weatherData.city,
+        temp: String(weatherData.temp),
+        unit: String(weatherData.unit || 'F'),
+        summary: String(weatherData.summary || 'N/A'),
+        icon: String(weatherData.icon || 'cloud')
       },
       calendar: {
-        enabled: Boolean(widgets.calendar.enabled),
-        lines: events
+        enabled: Boolean(calendarWidget.enabled),
+        selectedDate: String(calendarWidget.selectedDate || ''),
+        events
       },
       todo: {
-        enabled: Boolean(widgets.todo.enabled),
-        lines: todo
+        enabled: Boolean(todoWidget.enabled),
+        bulletStyle: normalizeBulletStyle(todoWidget.bulletStyle),
+        items: todoItems
       },
       note: {
-        enabled: Boolean(widgets.note.enabled),
-        text: (widgets.note.text || '').slice(0, 50)
+        enabled: Boolean(noteWidget.enabled),
+        catalog: noteCatalog
       }
     }
   };

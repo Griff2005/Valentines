@@ -18,28 +18,38 @@ const defaultState = {
         enabled: true,
         city: 'Los Angeles',
         unit: 'F',
-        summary: 'Sunny'
+        summary: 'Sunny',
+        icon: 'sun'
       },
       calendar: {
         enabled: true,
+        selectedDate: '',
         events: [
           {
             date: '2026-02-14',
             time: '19:00',
-            title: 'Date Night'
+            title: 'Date Night',
+            source: 'manual'
           }
         ]
       },
       todo: {
         enabled: true,
+        bulletStyle: 'dot',
         items: [
-          { text: 'Buy flowers', done: false },
-          { text: 'Set table', done: false }
+          { text: 'Buy flowers' },
+          { text: 'Set table' }
         ]
       },
       note: {
         enabled: true,
-        text: 'Love you forever!'
+        catalog: [
+          'Love you forever',
+          'You make my day',
+          'I am proud of you',
+          'You are my favorite',
+          'Smile, beautiful'
+        ]
       }
     },
     message: {

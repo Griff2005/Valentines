@@ -26,6 +26,34 @@ function mapWeatherCode(code) {
   return map[code] || 'Weather';
 }
 
+function mapWeatherIcon(code) {
+  if (code === 0 || code === 1) {
+    return 'sun';
+  }
+
+  if (code === 2 || code === 3) {
+    return 'cloud';
+  }
+
+  if (code === 45 || code === 48) {
+    return 'fog';
+  }
+
+  if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) {
+    return 'rain';
+  }
+
+  if ([71, 73, 75].includes(code)) {
+    return 'snow';
+  }
+
+  if (code === 95) {
+    return 'storm';
+  }
+
+  return 'cloud';
+}
+
 async function fetchJson(url) {
   const response = await fetch(url);
   if (!response.ok) {
@@ -84,7 +112,8 @@ async function getCurrentWeather({ city, unit }) {
     city: place.name,
     temp: Math.round(current.temperature_2m),
     unit: normalizedUnit,
-    summary: mapWeatherCode(current.weather_code)
+    summary: mapWeatherCode(current.weather_code),
+    icon: mapWeatherIcon(current.weather_code)
   };
 }
 

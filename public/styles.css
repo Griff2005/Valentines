@@ -362,13 +362,28 @@ textarea {
   background: #fff;
 }
 
-.calendar-row {
-  grid-template-columns: 124px 96px minmax(0, 1fr) auto;
+.calendar-item {
+  gap: 8px;
 }
 
-.todo-row {
-  grid-template-columns: auto minmax(0, 1fr) auto;
+.calendar-item-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.todo-item {
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
+}
+
+.note-item {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.note-item textarea {
+  min-height: 48px;
 }
 
 .hint {
@@ -455,8 +470,9 @@ canvas {
     grid-template-columns: 1fr;
   }
 
-  .calendar-row,
-  .todo-row {
+  .calendar-item-top,
+  .todo-item,
+  .note-item {
     grid-template-columns: 1fr;
   }
 }

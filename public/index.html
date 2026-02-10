@@ -109,7 +109,7 @@
 
             <section id="tab-widgets" class="tab-panel is-active">
               <h3>Widget Dashboard</h3>
-              <p class="card-help">Mix weather, calendar, todo, and note widgets in a compact board layout.</p>
+              <p class="card-help">Top row: time + weather + daily note. Bottom: todo list on the left, day schedule on the right.</p>
 
               <div class="widget-grid">
                 <article class="mini-card">
@@ -137,8 +137,16 @@
                     <h4>Calendar</h4>
                     <label class="checkbox inline"><input id="calendar-enabled" type="checkbox" /> Enabled</label>
                   </div>
+                  <label>
+                    <span>Calendar Day</span>
+                    <input id="calendar-day" type="date" />
+                  </label>
+                  <div class="button-row">
+                    <button id="import-ics" class="btn btn-ghost">Import Day From schedule.2026WI.ics</button>
+                    <button id="add-event" class="btn btn-ghost">Add Event</button>
+                  </div>
+                  <p id="calendar-import-status" class="hint"></p>
                   <div id="calendar-events" class="list-stack"></div>
-                  <button id="add-event" class="btn btn-ghost">Add Event</button>
                 </article>
 
                 <article class="mini-card">
@@ -146,19 +154,27 @@
                     <h4>To-do List</h4>
                     <label class="checkbox inline"><input id="todo-enabled" type="checkbox" /> Enabled</label>
                   </div>
+                  <label>
+                    <span>Bullet Style</span>
+                    <select id="todo-bullet-style">
+                      <option value="dot">Classic Dot</option>
+                      <option value="heart">Heart</option>
+                      <option value="star">Star</option>
+                      <option value="diamond">Diamond</option>
+                    </select>
+                  </label>
                   <div id="todo-items" class="list-stack"></div>
-                  <button id="add-todo" class="btn btn-ghost">Add To-do</button>
+                  <button id="add-todo" class="btn btn-ghost">Add Task</button>
                 </article>
 
                 <article class="mini-card">
                   <div class="mini-head">
-                    <h4>Small Message</h4>
+                    <h4>Note Catalog</h4>
                     <label class="checkbox inline"><input id="note-enabled" type="checkbox" /> Enabled</label>
                   </div>
-                  <label>
-                    <span>Message</span>
-                    <textarea id="note-text" rows="3" placeholder="Love you forever!"></textarea>
-                  </label>
+                  <p class="hint">One short note is shown per day, rotating through this list automatically.</p>
+                  <div id="note-items" class="list-stack"></div>
+                  <button id="add-note" class="btn btn-ghost">Add Note</button>
                 </article>
               </div>
             </section>
@@ -235,18 +251,27 @@
     </main>
 
     <template id="calendar-event-template">
-      <div class="list-row calendar-row">
-        <input type="date" data-role="date" />
-        <input type="time" data-role="time" />
-        <input type="text" data-role="title" placeholder="Event title" maxlength="40" />
-        <button data-role="remove" class="btn btn-danger">Remove</button>
+      <div class="list-row calendar-item">
+        <div class="calendar-item-top">
+          <input type="date" data-role="date" />
+          <input type="time" data-role="time" />
+          <button data-role="remove" class="btn btn-danger">Remove</button>
+        </div>
+        <input type="text" data-role="title" placeholder="Event title" maxlength="60" />
+        <input type="text" data-role="location" placeholder="Location (optional)" maxlength="60" />
       </div>
     </template>
 
     <template id="todo-item-template">
-      <div class="list-row todo-row">
-        <label class="checkbox inline"><input type="checkbox" data-role="done" /> Done</label>
-        <input type="text" data-role="text" placeholder="To-do item" maxlength="50" />
+      <div class="list-row todo-item">
+        <input type="text" data-role="text" placeholder="Task" maxlength="80" />
+        <button data-role="remove" class="btn btn-danger">Remove</button>
+      </div>
+    </template>
+
+    <template id="note-item-template">
+      <div class="list-row note-item">
+        <textarea rows="2" data-role="text" placeholder="Short note for this day"></textarea>
         <button data-role="remove" class="btn btn-danger">Remove</button>
       </div>
     </template>

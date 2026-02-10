@@ -7,6 +7,7 @@ const path = require('path');
 const { getState, saveState, normalizeState } = require('./services/stateStore');
 const { buildPayload } = require('./services/payloadBuilder');
 const { getCurrentWeather } = require('./services/weatherService');
+const { loadIcsEventsForDate, normalizeDateInput } = require('./services/calendarService');
 const {
   testConnection,
   installPiScript,
@@ -146,6 +147,26 @@ app.post(
     });
 
     res.json(weather);
+  })
+);
+
+app.get(
+  '/api/calendar/day',
+  asyncHandler(async (req, res) => {
+    const date = normalizeDateInput(req.query?.date);
+    const requestedFile = String(req.query?.file || 'schedule.2026WI.ics').trim() || 'schedule.2026WI.ics';
+    const filePath = path.isAbsolute(requestedFile)
+      ? requestedFile
+      : path.join(__dirname, requestedFile);
+
+    const calendar = await loadIcsEventsForDate(filePath, date);
+    res.json({
+      ok: true,
+      date: calendar.date,
+      events: calendar.events,
+      totalEventsInFile: calendar.totalEventsInFile,
+      file: requestedFile
+    });
   })
 );
 

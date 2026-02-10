@@ -9,10 +9,10 @@ A simple, intuitive website for remotely controlling a **64x32 LED matrix** conn
 ## Features
 
 - Widget dashboard mode:
-  - Weather widget (live weather by city)
-  - Calendar widget
-  - To-do widget
-  - Small message widget
+  - Weather widget (city + unit selection + icon)
+  - Calendar day widget (manual events + ICS day import from `schedule.2026WI.ics`)
+  - To-do widget (easy task add/remove + bullet style selection)
+  - Rotating daily note widget (from a note catalog)
 - Full-board message mode:
   - Custom text
   - Color + speed + effect (scroll/pulse/static)
@@ -174,6 +174,7 @@ sudo systemctl restart love-board
 - `GET /api/state`
 - `PUT /api/state`
 - `POST /api/weather`
+- `GET /api/calendar/day?date=YYYY-MM-DD`
 - `POST /api/pi/test`
 - `POST /api/pi/install`
 - `POST /api/board/push`

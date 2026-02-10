@@ -31,15 +31,20 @@ const ids = {
   weatherPreview: document.getElementById('weather-preview'),
 
   calendarEnabled: document.getElementById('calendar-enabled'),
+  calendarDay: document.getElementById('calendar-day'),
   calendarEvents: document.getElementById('calendar-events'),
   addEvent: document.getElementById('add-event'),
+  importIcs: document.getElementById('import-ics'),
+  calendarImportStatus: document.getElementById('calendar-import-status'),
 
   todoEnabled: document.getElementById('todo-enabled'),
+  todoBulletStyle: document.getElementById('todo-bullet-style'),
   todoItems: document.getElementById('todo-items'),
   addTodo: document.getElementById('add-todo'),
 
   noteEnabled: document.getElementById('note-enabled'),
-  noteText: document.getElementById('note-text'),
+  noteItems: document.getElementById('note-items'),
+  addNote: document.getElementById('add-note'),
 
   messageText: document.getElementById('message-text'),
   messageColor: document.getElementById('message-color'),
@@ -60,7 +65,8 @@ const ids = {
   previewCanvas: document.getElementById('preview-canvas'),
 
   calendarTemplate: document.getElementById('calendar-event-template'),
-  todoTemplate: document.getElementById('todo-item-template')
+  todoTemplate: document.getElementById('todo-item-template'),
+  noteTemplate: document.getElementById('note-item-template')
 };
 
 const previewCtx = ids.previewCanvas.getContext('2d');
@@ -101,8 +107,17 @@ async function api(url, options) {
   return payload;
 }
 
-function cloneState(value) {
-  return JSON.parse(JSON.stringify(value));
+function todayDateString() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function nowClockString() {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 }
 
 function createEmptyPixels() {
@@ -115,13 +130,62 @@ function ensurePixels() {
   }
 }
 
+function safeDate(value) {
+  const text = String(value || '').trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : '';
+}
+
+function safeTime(value) {
+  const text = String(value || '').trim();
+  return /^\d{2}:\d{2}$/.test(text) ? text : '';
+}
+
+function getDailyNote(catalog, forDate = new Date()) {
+  const notes = (Array.isArray(catalog) ? catalog : [])
+    .map((note) => String(note || '').trim())
+    .filter(Boolean);
+
+  if (!notes.length) {
+    return '';
+  }
+
+  const ordinal = Math.floor(forDate.getTime() / 86400000);
+  const safeIndex = Math.abs(ordinal) % notes.length;
+  return notes[safeIndex];
+}
+
+function bulletPreviewSymbol(style) {
+  if (style === 'heart') {
+    return '♥';
+  }
+  if (style === 'star') {
+    return '★';
+  }
+  if (style === 'diamond') {
+    return '◆';
+  }
+  return '•';
+}
+
+function sortCalendarEvents(events) {
+  return [...events].sort((a, b) => {
+    const left = `${a.date || ''}T${a.time || '00:00'}`;
+    const right = `${b.date || ''}T${b.time || '00:00'}`;
+    return left.localeCompare(right);
+  });
+}
+
 function renderCalendarEvents(events) {
   ids.calendarEvents.innerHTML = '';
-  for (const event of events) {
+
+  for (const event of sortCalendarEvents(events)) {
     const row = ids.calendarTemplate.content.firstElementChild.cloneNode(true);
-    row.querySelector('[data-role="date"]').value = event.date || '';
-    row.querySelector('[data-role="time"]').value = event.time || '';
+    row.dataset.source = event.source || 'manual';
+
+    row.querySelector('[data-role="date"]').value = safeDate(event.date);
+    row.querySelector('[data-role="time"]').value = safeTime(event.time);
     row.querySelector('[data-role="title"]').value = event.title || '';
+    row.querySelector('[data-role="location"]').value = event.location || '';
 
     row.querySelector('[data-role="remove"]').addEventListener('click', () => {
       row.remove();
@@ -142,9 +206,9 @@ function renderCalendarEvents(events) {
 
 function renderTodoItems(items) {
   ids.todoItems.innerHTML = '';
+
   for (const item of items) {
     const row = ids.todoTemplate.content.firstElementChild.cloneNode(true);
-    row.querySelector('[data-role="done"]').checked = Boolean(item.done);
     row.querySelector('[data-role="text"]').value = item.text || '';
 
     row.querySelector('[data-role="remove"]').addEventListener('click', () => {
@@ -153,36 +217,65 @@ function renderTodoItems(items) {
       drawPreview();
     });
 
-    row.querySelectorAll('input').forEach((input) => {
-      input.addEventListener('input', () => {
-        syncStateFromForm();
-        drawPreview();
-      });
+    row.querySelector('[data-role="text"]').addEventListener('input', () => {
+      syncStateFromForm();
+      drawPreview();
     });
 
     ids.todoItems.appendChild(row);
   }
 }
 
+function renderNoteItems(notes) {
+  ids.noteItems.innerHTML = '';
+
+  for (const note of notes) {
+    const row = ids.noteTemplate.content.firstElementChild.cloneNode(true);
+    row.querySelector('[data-role="text"]').value = note || '';
+
+    row.querySelector('[data-role="remove"]').addEventListener('click', () => {
+      row.remove();
+      syncStateFromForm();
+      drawPreview();
+    });
+
+    row.querySelector('[data-role="text"]').addEventListener('input', () => {
+      syncStateFromForm();
+      drawPreview();
+    });
+
+    ids.noteItems.appendChild(row);
+  }
+}
+
 function collectCalendarEvents() {
-  const rows = Array.from(ids.calendarEvents.querySelectorAll('.calendar-row'));
+  const rows = Array.from(ids.calendarEvents.querySelectorAll('.calendar-item'));
   return rows
     .map((row) => ({
-      date: row.querySelector('[data-role="date"]').value,
-      time: row.querySelector('[data-role="time"]').value,
-      title: row.querySelector('[data-role="title"]').value.trim()
+      date: safeDate(row.querySelector('[data-role="date"]').value),
+      time: safeTime(row.querySelector('[data-role="time"]').value) || '00:00',
+      title: row.querySelector('[data-role="title"]').value.trim(),
+      location: row.querySelector('[data-role="location"]').value.trim(),
+      source: row.dataset.source || 'manual'
     }))
-    .filter((item) => item.date || item.time || item.title);
+    .filter((event) => event.date && event.title);
 }
 
 function collectTodoItems() {
-  const rows = Array.from(ids.todoItems.querySelectorAll('.todo-row'));
+  const rows = Array.from(ids.todoItems.querySelectorAll('.todo-item'));
   return rows
     .map((row) => ({
-      done: row.querySelector('[data-role="done"]').checked,
       text: row.querySelector('[data-role="text"]').value.trim()
     }))
     .filter((item) => item.text);
+}
+
+function collectNotes() {
+  const rows = Array.from(ids.noteItems.querySelectorAll('.note-item'));
+  const notes = rows
+    .map((row) => row.querySelector('[data-role="text"]').value.trim())
+    .filter(Boolean);
+  return notes.length ? notes : ['Love you forever'];
 }
 
 function populateFormFromState() {
@@ -201,16 +294,21 @@ function populateFormFromState() {
   ids.weatherEnabled.checked = Boolean(widgets.weather.enabled);
   ids.weatherCity.value = widgets.weather.city || '';
   ids.weatherUnit.value = widgets.weather.unit || 'F';
-  ids.weatherPreview.textContent = widgets.weather.summary || '';
+  ids.weatherPreview.textContent = widgets.weather.summary
+    ? `${widgets.weather.city || ''}: ${widgets.weather.summary}`
+    : '';
 
   ids.calendarEnabled.checked = Boolean(widgets.calendar.enabled);
+  ids.calendarDay.value = safeDate(widgets.calendar.selectedDate) || todayDateString();
+  ids.calendarImportStatus.textContent = '';
   renderCalendarEvents(widgets.calendar.events || []);
 
   ids.todoEnabled.checked = Boolean(widgets.todo.enabled);
+  ids.todoBulletStyle.value = widgets.todo.bulletStyle || 'dot';
   renderTodoItems(widgets.todo.items || []);
 
   ids.noteEnabled.checked = Boolean(widgets.note.enabled);
-  ids.noteText.value = widgets.note.text || '';
+  renderNoteItems(widgets.note.catalog || []);
 
   ids.messageText.value = appState.board.message.text || '';
   ids.messageColor.value = appState.board.message.color || '#ff3b30';
@@ -246,13 +344,15 @@ function syncStateFromForm() {
   appState.board.widgets.weather.unit = ids.weatherUnit.value;
 
   appState.board.widgets.calendar.enabled = ids.calendarEnabled.checked;
+  appState.board.widgets.calendar.selectedDate = safeDate(ids.calendarDay.value) || todayDateString();
   appState.board.widgets.calendar.events = collectCalendarEvents();
 
   appState.board.widgets.todo.enabled = ids.todoEnabled.checked;
+  appState.board.widgets.todo.bulletStyle = ids.todoBulletStyle.value;
   appState.board.widgets.todo.items = collectTodoItems();
 
   appState.board.widgets.note.enabled = ids.noteEnabled.checked;
-  appState.board.widgets.note.text = ids.noteText.value.trim();
+  appState.board.widgets.note.catalog = collectNotes();
 
   appState.board.message.text = ids.messageText.value;
   appState.board.message.color = ids.messageColor.value;
@@ -319,6 +419,62 @@ function drawPixelCanvas() {
   }
 }
 
+function drawWidgetPreview(width, height) {
+  const widgets = appState.board.widgets;
+  const selectedDate = safeDate(widgets.calendar.selectedDate) || todayDateString();
+  const dayEvents = sortCalendarEvents(widgets.calendar.events || []).filter((event) => event.date === selectedDate);
+  const dailyNote = widgets.note.enabled ? getDailyNote(widgets.note.catalog || []) : 'OFF';
+  const weatherText = widgets.weather.enabled
+    ? `${widgets.weather.city || ''} ${widgets.weather.unit || ''}`.trim()
+    : 'OFF';
+
+  previewCtx.strokeStyle = 'rgba(255,255,255,0.18)';
+  previewCtx.lineWidth = 2;
+  previewCtx.strokeRect(0, 0, width, height);
+  previewCtx.beginPath();
+  previewCtx.moveTo(0, height * 0.25);
+  previewCtx.lineTo(width, height * 0.25);
+  previewCtx.moveTo(width * 0.5, height * 0.25);
+  previewCtx.lineTo(width * 0.5, height);
+  previewCtx.stroke();
+
+  previewCtx.fillStyle = '#ffe082';
+  previewCtx.font = '700 24px Space Grotesk';
+  previewCtx.textAlign = 'left';
+  previewCtx.fillText(nowClockString(), 14, 44);
+  previewCtx.fillStyle = '#8ed7ff';
+  previewCtx.fillText(weatherText.slice(0, 12), 150, 44);
+
+  previewCtx.fillStyle = '#ffd2a1';
+  previewCtx.font = '700 18px Space Grotesk';
+  previewCtx.fillText('NOTE', width * 0.63, 28);
+  previewCtx.fillStyle = '#fff9c4';
+  previewCtx.fillText((dailyNote || '').slice(0, 18), width * 0.63, 54);
+
+  previewCtx.fillStyle = '#ffe082';
+  previewCtx.font = '700 20px Space Grotesk';
+  previewCtx.fillText('TODO', 14, height * 0.34);
+  previewCtx.fillStyle = '#f4f4f4';
+  previewCtx.font = '500 18px Space Grotesk';
+
+  const bulletSymbol = bulletPreviewSymbol(widgets.todo.bulletStyle || 'dot');
+  const todoLines = (widgets.todo.items || []).slice(0, 3);
+  todoLines.forEach((item, index) => {
+    previewCtx.fillText(`${bulletSymbol} ${item.text}`.slice(0, 20), 14, height * 0.42 + index * 28);
+  });
+
+  previewCtx.fillStyle = '#ffe082';
+  previewCtx.font = '700 20px Space Grotesk';
+  previewCtx.fillText('TODAY', width * 0.53, height * 0.34);
+  previewCtx.fillStyle = '#f4f4f4';
+  previewCtx.font = '500 16px Space Grotesk';
+
+  dayEvents.slice(0, 4).forEach((event, index) => {
+    const line = `${event.time || '--:--'} ${event.title || ''}`.trim();
+    previewCtx.fillText(line.slice(0, 24), width * 0.53, height * 0.42 + index * 24);
+  });
+}
+
 function drawPreview() {
   if (!appState) {
     return;
@@ -371,46 +527,7 @@ function drawPreview() {
     return;
   }
 
-  previewCtx.strokeStyle = 'rgba(255,255,255,0.2)';
-  previewCtx.lineWidth = 2;
-  previewCtx.strokeRect(0, 0, w, h);
-  previewCtx.beginPath();
-  previewCtx.moveTo(w / 2, 0);
-  previewCtx.lineTo(w / 2, h);
-  previewCtx.moveTo(0, h / 2);
-  previewCtx.lineTo(w, h / 2);
-  previewCtx.stroke();
-
-  previewCtx.fillStyle = '#ffe082';
-  previewCtx.font = '700 28px Space Grotesk';
-  previewCtx.textAlign = 'left';
-  previewCtx.fillText('WEA', 20, 34);
-  previewCtx.fillText('CAL', w / 2 + 20, 34);
-  previewCtx.fillText('TODO', 20, h / 2 + 34);
-  previewCtx.fillText('NOTE', w / 2 + 20, h / 2 + 34);
-
-  previewCtx.fillStyle = '#f4f4f4';
-  previewCtx.font = '500 20px Space Grotesk';
-  previewCtx.fillText(
-    appState.board.widgets.weather.enabled
-      ? `${appState.board.widgets.weather.city || ''}`
-      : 'OFF',
-    20,
-    66
-  );
-
-  const firstEvent = appState.board.widgets.calendar.events[0];
-  previewCtx.fillText(firstEvent ? firstEvent.title.slice(0, 16) : 'No event', w / 2 + 20, 66);
-
-  const firstTodo = appState.board.widgets.todo.items[0];
-  previewCtx.fillText(firstTodo ? firstTodo.text.slice(0, 16) : 'No to-do', 20, h / 2 + 66);
-  previewCtx.fillText(
-    appState.board.widgets.note.enabled
-      ? (appState.board.widgets.note.text || '').slice(0, 18)
-      : 'OFF',
-    w / 2 + 20,
-    h / 2 + 66
-  );
+  drawWidgetPreview(w, h);
 }
 
 function setActiveTab(tabName) {
@@ -453,6 +570,32 @@ async function pushMode(mode) {
 
   setStatus('success', `${mode} is now running on the LED board.`);
   return result;
+}
+
+async function importCalendarDayFromIcs() {
+  syncStateFromForm();
+  const date = safeDate(ids.calendarDay.value) || todayDateString();
+
+  setStatus('working', `Importing ${date} from schedule.2026WI.ics...`);
+
+  const payload = await api(`/api/calendar/day?date=${encodeURIComponent(date)}`, {
+    method: 'GET'
+  });
+
+  const existing = collectCalendarEvents().filter((event) => event.date !== date);
+  const imported = payload.events.map((event) => ({
+    date: event.date,
+    time: event.time || '00:00',
+    title: event.title,
+    location: event.location || '',
+    source: 'ics'
+  }));
+
+  appState.board.widgets.calendar.events = [...existing, ...imported];
+  renderCalendarEvents(appState.board.widgets.calendar.events);
+  ids.calendarImportStatus.textContent = `Imported ${imported.length} event${imported.length === 1 ? '' : 's'} for ${date}.`;
+  setStatus('success', `Calendar imported for ${date}.`);
+  drawPreview();
 }
 
 async function init() {
@@ -537,6 +680,7 @@ function registerEvents() {
       const summary = `${weather.city}: ${weather.temp}${weather.unit}, ${weather.summary}`;
       ids.weatherPreview.textContent = summary;
       appState.board.widgets.weather.summary = weather.summary;
+      appState.board.widgets.weather.icon = weather.icon;
       setStatus('success', 'Weather preview updated.');
       drawPreview();
     } catch (error) {
@@ -544,13 +688,25 @@ function registerEvents() {
     }
   });
 
+  ids.importIcs.addEventListener('click', async () => {
+    try {
+      await importCalendarDayFromIcs();
+    } catch (error) {
+      setStatus('error', error.message);
+      ids.calendarImportStatus.textContent = `Import failed: ${error.message}`;
+    }
+  });
+
   ids.addEvent.addEventListener('click', () => {
+    const date = safeDate(ids.calendarDay.value) || todayDateString();
     renderCalendarEvents([
       ...collectCalendarEvents(),
       {
-        date: '',
-        time: '',
-        title: ''
+        date,
+        time: '09:00',
+        title: '',
+        location: '',
+        source: 'manual'
       }
     ]);
     syncStateFromForm();
@@ -561,10 +717,15 @@ function registerEvents() {
     renderTodoItems([
       ...collectTodoItems(),
       {
-        done: false,
         text: ''
       }
     ]);
+    syncStateFromForm();
+    drawPreview();
+  });
+
+  ids.addNote.addEventListener('click', () => {
+    renderNoteItems([...collectNotes(), '']);
     syncStateFromForm();
     drawPreview();
   });
@@ -587,9 +748,10 @@ function registerEvents() {
     ids.weatherCity,
     ids.weatherUnit,
     ids.calendarEnabled,
+    ids.calendarDay,
     ids.todoEnabled,
+    ids.todoBulletStyle,
     ids.noteEnabled,
-    ids.noteText,
     ids.messageText,
     ids.messageColor,
     ids.messageEffect,

@@ -44,6 +44,66 @@ function sanitizePixels(pixels, width, height) {
   });
 }
 
+function getTodayDateString() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function sanitizeDate(value, fallback = getTodayDateString()) {
+  const text = String(value || '').trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : fallback;
+}
+
+function sanitizeTime(value) {
+  const text = String(value || '').trim();
+  return /^\d{2}:\d{2}$/.test(text) ? text : '';
+}
+
+function sanitizeCalendarEvents(events) {
+  if (!Array.isArray(events)) {
+    return [];
+  }
+
+  return events
+    .map((event) => ({
+      date: sanitizeDate(event?.date, ''),
+      time: sanitizeTime(event?.time),
+      title: String(event?.title || '').trim().slice(0, 80),
+      location: String(event?.location || '').trim().slice(0, 80),
+      source: String(event?.source || 'manual').trim().slice(0, 24) || 'manual'
+    }))
+    .filter((event) => event.date && event.title);
+}
+
+function sanitizeTodoItems(items) {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+
+  return items
+    .map((item) => ({
+      text: String(item?.text || '').trim().slice(0, 80)
+    }))
+    .filter((item) => item.text);
+}
+
+function sanitizeNoteCatalog(noteWidget) {
+  const directCatalog = Array.isArray(noteWidget.catalog) ? noteWidget.catalog : [];
+  const migratedText = typeof noteWidget.text === 'string' ? [noteWidget.text] : [];
+
+  const merged = [...directCatalog, ...migratedText];
+
+  const normalized = merged
+    .map((value) => String(value || '').trim().slice(0, 80))
+    .filter(Boolean);
+
+  const deduped = Array.from(new Set(normalized));
+  return deduped.length ? deduped : ['Love you forever'];
+}
+
 function normalizeState(inputState) {
   const merged = deepMerge(defaultState, inputState || {});
   merged.board.width = 64;
@@ -55,13 +115,25 @@ function normalizeState(inputState) {
     merged.board.height
   );
 
-  if (!Array.isArray(merged.board.widgets.calendar.events)) {
-    merged.board.widgets.calendar.events = [];
-  }
+  const weather = merged.board.widgets.weather;
+  weather.city = String(weather.city || '').trim();
+  weather.unit = String(weather.unit || 'F').toUpperCase() === 'C' ? 'C' : 'F';
+  weather.summary = String(weather.summary || '').trim().slice(0, 40);
+  weather.icon = String(weather.icon || 'sun').trim().slice(0, 16) || 'sun';
 
-  if (!Array.isArray(merged.board.widgets.todo.items)) {
-    merged.board.widgets.todo.items = [];
-  }
+  const calendar = merged.board.widgets.calendar;
+  calendar.selectedDate = sanitizeDate(calendar.selectedDate);
+  calendar.events = sanitizeCalendarEvents(calendar.events);
+
+  const todo = merged.board.widgets.todo;
+  const allowedBullets = new Set(['dot', 'heart', 'star', 'diamond']);
+  const bulletStyle = String(todo.bulletStyle || '').trim().toLowerCase();
+  todo.bulletStyle = allowedBullets.has(bulletStyle) ? bulletStyle : 'dot';
+  todo.items = sanitizeTodoItems(todo.items);
+
+  const note = merged.board.widgets.note;
+  note.catalog = sanitizeNoteCatalog(note);
+  delete note.text;
 
   return merged;
 }
