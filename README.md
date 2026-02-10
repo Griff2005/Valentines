@@ -35,6 +35,8 @@ A simple, intuitive website for remotely controlling a **64x32 LED matrix** conn
 - `pi/install_pi_side.sh`: optional helper to install Python bindings on Pi
 - `pi/setup_web_service.sh`: installs and enables always-on `systemd` web service on Pi
 - `pi/update_web_service.sh`: pulls latest Git changes, reinstalls deps, restarts service
+- `pi/setup_pretty_url.sh`: configures Nginx reverse proxy so URL can be `http://<name>.local`
+- `pi/set_hostname.sh`: optional helper to rename the Pi hostname (for nicer `.local` URL)
 - `pi/love-board.env.example`: environment settings template for production
 - `data/defaultState.js`: default app state
 
@@ -89,6 +91,31 @@ You can also try:
 
 ```text
 http://lrdigiboard.local:3000
+```
+
+### Nicer URL (No `:3000`)
+
+You can expose the app on port 80 and open it as `http://<name>.local`.
+
+1. Optional: rename the Pi hostname (example: `loveboard`):
+
+```bash
+cd ~/Valentines
+bash pi/set_hostname.sh loveboard
+sudo reboot
+```
+
+2. Configure Nginx reverse proxy:
+
+```bash
+cd ~/Valentines
+bash pi/setup_pretty_url.sh 3000 loveboard
+```
+
+3. Open from phone:
+
+```text
+http://loveboard.local
 ```
 
 ### Updating After New Git Commits
@@ -168,6 +195,10 @@ sudo systemctl restart love-board
 - Service does not start on boot:
   - Run `sudo systemctl enable --now love-board`.
   - Check logs with `sudo journalctl -u love-board -n 100 --no-pager`.
+- Pretty URL not loading:
+  - Check `sudo systemctl status nginx`.
+  - Check `sudo nginx -t`.
+  - Ensure phone and Pi are on the same Wi-Fi.
 
 ## API Endpoints
 
