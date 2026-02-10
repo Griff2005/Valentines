@@ -45,13 +45,6 @@ as_root apt-get install -y nodejs npm build-essential python3 curl ca-certificat
 
 cd "$APP_DIR"
 
-echo "Installing Node dependencies in $APP_DIR..."
-if [[ -f package-lock.json ]]; then
-  as_user npm ci --omit=dev
-else
-  as_user npm install --omit=dev
-fi
-
 NODE_BIN="$(command -v node || true)"
 if [[ -z "$NODE_BIN" ]]; then
   echo "Node.js is not installed or not in PATH after installation."
@@ -75,6 +68,13 @@ if (( NODE_MAJOR < 18 )); then
     echo "Node.js version is still too old. Need >= 18."
     exit 1
   fi
+fi
+
+echo "Installing Node dependencies in $APP_DIR..."
+if [[ -f package-lock.json ]]; then
+  as_user npm ci --omit=dev --no-audit --no-fund
+else
+  as_user npm install --omit=dev --no-audit --no-fund
 fi
 
 if [[ ! -f "$ENV_FILE" ]]; then

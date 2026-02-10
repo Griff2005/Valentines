@@ -34,6 +34,7 @@ A simple, intuitive website for remotely controlling a **64x32 LED matrix** conn
 - `pi/remote_display.py`: renderer script run on Raspberry Pi
 - `pi/install_pi_side.sh`: optional helper to install Python bindings on Pi
 - `pi/setup_web_service.sh`: installs and enables always-on `systemd` web service on Pi
+- `pi/update_web_service.sh`: pulls latest Git changes, reinstalls deps, restarts service
 - `pi/love-board.env.example`: environment settings template for production
 - `data/defaultState.js`: default app state
 
@@ -88,6 +89,21 @@ You can also try:
 
 ```text
 http://lrdigiboard.local:3000
+```
+
+### Updating After New Git Commits
+
+After you push new commits and want the Pi to update:
+
+```bash
+cd ~/Valentines
+bash pi/update_web_service.sh
+```
+
+Or, to update a specific branch:
+
+```bash
+bash pi/update_web_service.sh main
 ```
 
 ## Raspberry Pi Matrix Setup
