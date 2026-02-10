@@ -118,6 +118,7 @@ function normalizeState(inputState) {
   const weather = merged.board.widgets.weather;
   weather.city = String(weather.city || '').trim();
   weather.unit = String(weather.unit || 'F').toUpperCase() === 'C' ? 'C' : 'F';
+  weather.temp = String(weather.temp ?? '').trim().slice(0, 6) || '--';
   weather.summary = String(weather.summary || '').trim().slice(0, 40);
   weather.icon = String(weather.icon || 'sun').trim().slice(0, 16) || 'sun';
 

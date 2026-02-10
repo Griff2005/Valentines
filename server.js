@@ -59,7 +59,7 @@ function parseBasicAuth(headerValue) {
 }
 
 function requestAuth(res) {
-  res.set('WWW-Authenticate', 'Basic realm="Love Board Remote"');
+  res.set('WWW-Authenticate', 'Basic realm="Lyda Board Remote"');
   res.status(401).send('Authentication required');
 }
 

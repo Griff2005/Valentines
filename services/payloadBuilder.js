@@ -83,7 +83,7 @@ async function buildWidgetPayload(state, getWeather) {
 
   let weatherData = {
     city: weatherWidget.city,
-    temp: '--',
+    temp: weatherWidget.temp || '--',
     unit: weatherWidget.unit || 'F',
     summary: weatherWidget.summary || 'N/A',
     icon: weatherWidget.icon || 'cloud'

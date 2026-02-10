@@ -152,6 +152,17 @@ def text_width(text):
     return len(str(text or '')) * 4
 
 
+def draw_text_compact(canvas, x, y, text, color):
+    cursor = x
+    for char in text:
+        draw_char(canvas, cursor, y, char, color)
+        cursor += 3
+
+
+def compact_text_width(text):
+    return len(str(text or '')) * 3
+
+
 def wrap_text(text, max_chars, max_lines):
     words = str(text or '').split()
     if not words:
@@ -337,16 +348,27 @@ def format_event_time(value):
     return '00:00'
 
 
-def todays_events(events):
-    today = datetime.now().strftime('%Y-%m-%d')
+def upcoming_events(events):
+    now = datetime.now()
+    today = now.strftime('%Y-%m-%d')
+    current_minutes = now.hour * 60 + now.minute
     valid = []
 
     for event in events:
         if str(event.get('date') or '').strip() != today:
             continue
 
+        time_text = format_event_time(event.get('time'))
+        try:
+            minutes = int(time_text[:2]) * 60 + int(time_text[3:5])
+        except ValueError:
+            minutes = 0
+
+        if minutes < current_minutes:
+            continue
+
         valid.append({
-            'time': format_event_time(event.get('time')),
+            'time': time_text,
             'title': str(event.get('title') or '').strip()
         })
 
@@ -374,23 +396,56 @@ def run_widgets(matrix, payload):
         draw_hline(canvas, 0, matrix.width - 1, 7, border)
         draw_vline(canvas, 31, 8, matrix.height - 1, border)
 
-        # Top-left: live time + weather
-        time_text = datetime.now().strftime('%H:%M')
-        draw_text(canvas, 1, 1, time_text, (255, 242, 194))
+        # Top-left: live time + date + weather (compact spacing)
+        now = datetime.now()
+        time_text = f"{now.hour}:{now.minute:02d}"
+        date_text = f"{now.strftime('%b')} {now.day}"
+        clock_text = f"{time_text} {date_text}"
+        clock_x = 1
+        draw_text_compact(canvas, clock_x, 1, clock_text, (255, 242, 194))
+        weather_x = clock_x + compact_text_width(clock_text) + 1
 
-        if weather.get('enabled', True):
-            temp_text = fit_text(f"{weather.get('temp', '--')}{weather.get('unit', 'F')}", 4)
-            draw_text(canvas, 22, 1, temp_text, (155, 236, 255))
-            draw_weather_icon(canvas, 39, 1, weather.get('icon', 'cloud'))
-        else:
-            draw_text(canvas, 22, 1, 'OFF', muted_color)
-
-        # Top-right: short daily note rotated from catalog
         if note.get('enabled', True):
             daily_note = pick_daily_note(note.get('catalog', []))
-            draw_text(canvas, 47, 1, fit_text(daily_note, 4), (255, 195, 143))
+            note_color = (255, 195, 143)
+            note_text = fit_text(daily_note, 4)
         else:
-            draw_text(canvas, 47, 1, 'OFF', muted_color)
+            note_color = muted_color
+            note_text = 'OFF'
+
+        note_width = compact_text_width(note_text)
+        note_x = matrix.width - note_width - 1
+
+        if weather.get('enabled', True):
+            temp_value = str(weather.get('temp', '--')).strip()
+            unit_value = str(weather.get('unit', 'F')).strip()
+            temp_text = fit_text(f"{temp_value}{unit_value}", 4)
+            temp_text_no_unit = fit_text(temp_value, 3)
+            draw_temp_text = temp_text
+            icon_x = weather_x + compact_text_width(draw_temp_text) + 1
+
+            icon_width = 5
+            if icon_x + icon_width >= note_x and note.get('enabled', True) and len(note_text) > 3:
+                note_text = fit_text(daily_note, 3)
+                note_width = compact_text_width(note_text)
+                note_x = matrix.width - note_width - 1
+
+            if icon_x + icon_width >= note_x:
+                draw_temp_text = temp_text_no_unit
+                icon_x = weather_x + compact_text_width(draw_temp_text) + 1
+
+            if icon_x + icon_width >= note_x and note.get('enabled', True) and len(note_text) > 2:
+                note_text = fit_text(daily_note, 2)
+                note_width = compact_text_width(note_text)
+                note_x = matrix.width - note_width - 1
+
+            draw_text_compact(canvas, weather_x, 1, draw_temp_text, (155, 236, 255))
+            draw_weather_icon(canvas, icon_x, 1, weather.get('icon', 'cloud'))
+        else:
+            draw_text_compact(canvas, weather_x, 1, 'OFF', muted_color)
+
+        # Top-right: short daily note rotated from catalog
+        draw_text_compact(canvas, note_x, 1, note_text, note_color)
 
         # Bottom-left: todo list with bullet styles
         draw_text(canvas, 1, 9, 'TODO', title_color)
@@ -410,7 +465,7 @@ def run_widgets(matrix, payload):
 
         # Bottom-right: today's calendar events
         draw_text(canvas, 33, 9, 'DAY', title_color)
-        day_events = todays_events(calendar.get('events', [])) if calendar.get('enabled', True) else []
+        day_events = upcoming_events(calendar.get('events', [])) if calendar.get('enabled', True) else []
         cal_y = 15
 
         if not calendar.get('enabled', True):

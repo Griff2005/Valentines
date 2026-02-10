@@ -19,7 +19,8 @@ const defaultState = {
         city: 'Los Angeles',
         unit: 'F',
         summary: 'Sunny',
-        icon: 'sun'
+        icon: 'sun',
+        temp: '--'
       },
       calendar: {
         enabled: true,

@@ -32,6 +32,9 @@ const ids = {
 
   calendarEnabled: document.getElementById('calendar-enabled'),
   calendarDay: document.getElementById('calendar-day'),
+  calendarJumpToday: document.getElementById('calendar-jump-today'),
+  calendarJumpNext: document.getElementById('calendar-jump-next'),
+  calendarJumpWeek: document.getElementById('calendar-jump-week'),
   calendarEvents: document.getElementById('calendar-events'),
   addEvent: document.getElementById('add-event'),
   importIcs: document.getElementById('import-ics'),
@@ -43,8 +46,10 @@ const ids = {
   addTodo: document.getElementById('add-todo'),
 
   noteEnabled: document.getElementById('note-enabled'),
-  noteItems: document.getElementById('note-items'),
+  noteSelect: document.getElementById('note-select'),
+  noteText: document.getElementById('note-text'),
   addNote: document.getElementById('add-note'),
+  removeNote: document.getElementById('remove-note'),
 
   messageText: document.getElementById('message-text'),
   messageColor: document.getElementById('message-color'),
@@ -65,8 +70,7 @@ const ids = {
   previewCanvas: document.getElementById('preview-canvas'),
 
   calendarTemplate: document.getElementById('calendar-event-template'),
-  todoTemplate: document.getElementById('todo-item-template'),
-  noteTemplate: document.getElementById('note-item-template')
+  todoTemplate: document.getElementById('todo-item-template')
 };
 
 const previewCtx = ids.previewCanvas.getContext('2d');
@@ -76,6 +80,8 @@ let appState = null;
 let activeTab = 'widgets';
 let isDrawing = false;
 let eraserActive = false;
+let noteCatalogCache = [];
+let noteSelectionIndex = 0;
 
 function setStatus(type, text) {
   ids.statusPill.className = 'status-pill';
@@ -115,9 +121,16 @@ function todayDateString() {
   return `${year}-${month}-${day}`;
 }
 
+function shortDateString(value = new Date()) {
+  const month = value.toLocaleString('en-US', { month: 'short' });
+  return `${month} ${value.getDate()}`;
+}
+
 function nowClockString() {
   const now = new Date();
-  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const hours = String(now.getHours());
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes} ${shortDateString(now)}`;
 }
 
 function createEmptyPixels() {
@@ -226,25 +239,45 @@ function renderTodoItems(items) {
   }
 }
 
-function renderNoteItems(notes) {
-  ids.noteItems.innerHTML = '';
+function cleanNoteText(value) {
+  return String(value || '').trim().slice(0, 80);
+}
 
-  for (const note of notes) {
-    const row = ids.noteTemplate.content.firstElementChild.cloneNode(true);
-    row.querySelector('[data-role="text"]').value = note || '';
+function noteOptionLabel(value) {
+  const cleaned = cleanNoteText(value);
+  if (!cleaned) {
+    return 'Untitled note';
+  }
+  return cleaned.length > 40 ? `${cleaned.slice(0, 37)}...` : cleaned;
+}
 
-    row.querySelector('[data-role="remove"]').addEventListener('click', () => {
-      row.remove();
-      syncStateFromForm();
-      drawPreview();
-    });
+function renderNoteSelector(notes) {
+  noteCatalogCache = Array.isArray(notes) ? notes.map((note) => cleanNoteText(note)) : [];
+  noteCatalogCache = noteCatalogCache.filter((note) => note.length);
+  if (!noteCatalogCache.length) {
+    noteCatalogCache = ['Love you forever'];
+  }
 
-    row.querySelector('[data-role="text"]').addEventListener('input', () => {
-      syncStateFromForm();
-      drawPreview();
-    });
+  if (noteSelectionIndex >= noteCatalogCache.length) {
+    noteSelectionIndex = 0;
+  }
 
-    ids.noteItems.appendChild(row);
+  ids.noteSelect.innerHTML = '';
+  noteCatalogCache.forEach((note, index) => {
+    const option = document.createElement('option');
+    option.value = String(index);
+    option.textContent = noteOptionLabel(note);
+    ids.noteSelect.appendChild(option);
+  });
+
+  ids.noteSelect.value = String(noteSelectionIndex);
+  ids.noteText.value = noteCatalogCache[noteSelectionIndex] || '';
+}
+
+function updateNoteOption(index, value) {
+  const option = ids.noteSelect.options[index];
+  if (option) {
+    option.textContent = noteOptionLabel(value);
   }
 }
 
@@ -271,11 +304,7 @@ function collectTodoItems() {
 }
 
 function collectNotes() {
-  const rows = Array.from(ids.noteItems.querySelectorAll('.note-item'));
-  const notes = rows
-    .map((row) => row.querySelector('[data-role="text"]').value.trim())
-    .filter(Boolean);
-  return notes.length ? notes : ['Love you forever'];
+  return noteCatalogCache.length ? noteCatalogCache.slice() : ['Love you forever'];
 }
 
 function populateFormFromState() {
@@ -294,9 +323,9 @@ function populateFormFromState() {
   ids.weatherEnabled.checked = Boolean(widgets.weather.enabled);
   ids.weatherCity.value = widgets.weather.city || '';
   ids.weatherUnit.value = widgets.weather.unit || 'F';
-  ids.weatherPreview.textContent = widgets.weather.summary
-    ? `${widgets.weather.city || ''}: ${widgets.weather.summary}`
-    : '';
+  const tempLabel = widgets.weather.temp ? `${widgets.weather.temp}${widgets.weather.unit || ''}` : '';
+  const iconLabel = widgets.weather.icon ? widgets.weather.icon : '';
+  ids.weatherPreview.textContent = tempLabel ? `${tempLabel} ${iconLabel}`.trim() : '';
 
   ids.calendarEnabled.checked = Boolean(widgets.calendar.enabled);
   ids.calendarDay.value = safeDate(widgets.calendar.selectedDate) || todayDateString();
@@ -308,7 +337,7 @@ function populateFormFromState() {
   renderTodoItems(widgets.todo.items || []);
 
   ids.noteEnabled.checked = Boolean(widgets.note.enabled);
-  renderNoteItems(widgets.note.catalog || []);
+  renderNoteSelector(widgets.note.catalog || []);
 
   ids.messageText.value = appState.board.message.text || '';
   ids.messageColor.value = appState.board.message.color || '#ff3b30';
@@ -422,11 +451,21 @@ function drawPixelCanvas() {
 function drawWidgetPreview(width, height) {
   const widgets = appState.board.widgets;
   const selectedDate = safeDate(widgets.calendar.selectedDate) || todayDateString();
+  const today = todayDateString();
+  const now = new Date();
   const dayEvents = sortCalendarEvents(widgets.calendar.events || []).filter((event) => event.date === selectedDate);
+  const upcomingEvents =
+    selectedDate === today
+      ? dayEvents.filter((event) => {
+          const safeEventTime = safeTime(event.time) || '00:00';
+          const eventDate = new Date(`${event.date}T${safeEventTime}:00`);
+          return eventDate.getTime() >= now.getTime();
+        })
+      : dayEvents;
   const dailyNote = widgets.note.enabled ? getDailyNote(widgets.note.catalog || []) : 'OFF';
-  const weatherText = widgets.weather.enabled
-    ? `${widgets.weather.city || ''} ${widgets.weather.unit || ''}`.trim()
-    : 'OFF';
+  const weatherTemp = widgets.weather.temp ? `${widgets.weather.temp}${widgets.weather.unit || ''}`.trim() : '--';
+  const weatherIcon = widgets.weather.icon ? widgets.weather.icon : '';
+  const weatherText = widgets.weather.enabled ? `${weatherTemp} ${weatherIcon}`.trim() : 'OFF';
 
   previewCtx.strokeStyle = 'rgba(255,255,255,0.18)';
   previewCtx.lineWidth = 2;
@@ -469,7 +508,7 @@ function drawWidgetPreview(width, height) {
   previewCtx.fillStyle = '#f4f4f4';
   previewCtx.font = '500 16px Space Grotesk';
 
-  dayEvents.slice(0, 4).forEach((event, index) => {
+  upcomingEvents.slice(0, 4).forEach((event, index) => {
     const line = `${event.time || '--:--'} ${event.title || ''}`.trim();
     previewCtx.fillText(line.slice(0, 24), width * 0.53, height * 0.42 + index * 24);
   });
@@ -598,6 +637,20 @@ async function importCalendarDayFromIcs() {
   drawPreview();
 }
 
+function setCalendarDay(value) {
+  const safeValue = safeDate(value) || todayDateString();
+  ids.calendarDay.value = safeValue;
+  syncStateFromForm();
+  drawPreview();
+}
+
+function shiftCalendarDay(offsetDays) {
+  const base = safeDate(ids.calendarDay.value) || todayDateString();
+  const date = new Date(`${base}T00:00:00`);
+  date.setDate(date.getDate() + offsetDays);
+  setCalendarDay(date.toISOString().slice(0, 10));
+}
+
 async function init() {
   setStatus('working', 'Loading saved settings...');
   appState = await api('/api/state');
@@ -677,10 +730,11 @@ function registerEvents() {
         })
       });
 
-      const summary = `${weather.city}: ${weather.temp}${weather.unit}, ${weather.summary}`;
+      const summary = `${weather.temp}${weather.unit} ${weather.icon}`.trim();
       ids.weatherPreview.textContent = summary;
       appState.board.widgets.weather.summary = weather.summary;
       appState.board.widgets.weather.icon = weather.icon;
+      appState.board.widgets.weather.temp = weather.temp;
       setStatus('success', 'Weather preview updated.');
       drawPreview();
     } catch (error) {
@@ -695,6 +749,18 @@ function registerEvents() {
       setStatus('error', error.message);
       ids.calendarImportStatus.textContent = `Import failed: ${error.message}`;
     }
+  });
+
+  ids.calendarJumpToday.addEventListener('click', () => {
+    setCalendarDay(todayDateString());
+  });
+
+  ids.calendarJumpNext.addEventListener('click', () => {
+    shiftCalendarDay(1);
+  });
+
+  ids.calendarJumpWeek.addEventListener('click', () => {
+    shiftCalendarDay(7);
   });
 
   ids.addEvent.addEventListener('click', () => {
@@ -724,8 +790,50 @@ function registerEvents() {
     drawPreview();
   });
 
+  ids.noteSelect.addEventListener('change', () => {
+    noteSelectionIndex = Number(ids.noteSelect.value) || 0;
+    ids.noteText.value = noteCatalogCache[noteSelectionIndex] || '';
+    syncStateFromForm();
+    drawPreview();
+  });
+
+  ids.noteText.addEventListener('input', () => {
+    if (!noteCatalogCache.length) {
+      noteCatalogCache = [''];
+      noteSelectionIndex = 0;
+    }
+    const nextValue = ids.noteText.value.slice(0, 80);
+    if (nextValue !== ids.noteText.value) {
+      ids.noteText.value = nextValue;
+    }
+    noteCatalogCache[noteSelectionIndex] = nextValue;
+    updateNoteOption(noteSelectionIndex, nextValue);
+    syncStateFromForm();
+    drawPreview();
+  });
+
   ids.addNote.addEventListener('click', () => {
-    renderNoteItems([...collectNotes(), '']);
+    noteCatalogCache.push('New note');
+    noteSelectionIndex = noteCatalogCache.length - 1;
+    renderNoteSelector(noteCatalogCache);
+    syncStateFromForm();
+    drawPreview();
+  });
+
+  ids.removeNote.addEventListener('click', () => {
+    if (!noteCatalogCache.length) {
+      noteCatalogCache = ['Love you forever'];
+      noteSelectionIndex = 0;
+    } else {
+      noteCatalogCache.splice(noteSelectionIndex, 1);
+      if (!noteCatalogCache.length) {
+        noteCatalogCache = ['Love you forever'];
+        noteSelectionIndex = 0;
+      } else if (noteSelectionIndex >= noteCatalogCache.length) {
+        noteSelectionIndex = noteCatalogCache.length - 1;
+      }
+    }
+    renderNoteSelector(noteCatalogCache);
     syncStateFromForm();
     drawPreview();
   });

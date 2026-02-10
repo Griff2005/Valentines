@@ -97,7 +97,7 @@ fi
 echo "Writing systemd service: $SERVICE_FILE"
 as_root tee "$SERVICE_FILE" >/dev/null <<SERVICE
 [Unit]
-Description=Love Board Remote Web Server
+Description=Lyda Board Remote Web Server
 After=network-online.target
 Wants=network-online.target
 

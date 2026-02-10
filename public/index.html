@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Love Board Remote</title>
+    <title>Lyda Board Remote</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -20,7 +20,7 @@
       <header class="hero fade-in">
         <div>
           <p class="kicker">Remote LED Matrix Control</p>
-          <h1>Love Board Remote</h1>
+          <h1>Lyda Board Remote</h1>
           <p class="subline">Manage widgets, full-board messages, animations, and pixel art for your 64x32 display.</p>
         </div>
         <div class="hero-actions">
@@ -119,7 +119,7 @@
                   </div>
                   <label>
                     <span>City</span>
-                    <input id="weather-city" type="text" placeholder="Los Angeles" />
+                    <input id="weather-city" type="text" placeholder="Peterborough" />
                   </label>
                   <label>
                     <span>Unit</span>
@@ -141,6 +141,11 @@
                     <span>Calendar Day</span>
                     <input id="calendar-day" type="date" />
                   </label>
+                  <div class="button-row compact">
+                    <button id="calendar-jump-today" class="btn btn-ghost">Today</button>
+                    <button id="calendar-jump-next" class="btn btn-ghost">Tomorrow</button>
+                    <button id="calendar-jump-week" class="btn btn-ghost">+7 Days</button>
+                  </div>
                   <div class="button-row">
                     <button id="import-ics" class="btn btn-ghost">Import Day From schedule.2026WI.ics</button>
                     <button id="add-event" class="btn btn-ghost">Add Event</button>
@@ -173,8 +178,18 @@
                     <label class="checkbox inline"><input id="note-enabled" type="checkbox" /> Enabled</label>
                   </div>
                   <p class="hint">One short note is shown per day, rotating through this list automatically.</p>
-                  <div id="note-items" class="list-stack"></div>
-                  <button id="add-note" class="btn btn-ghost">Add Note</button>
+                  <label>
+                    <span>Choose Note</span>
+                    <select id="note-select"></select>
+                  </label>
+                  <label>
+                    <span>Edit Note</span>
+                    <textarea id="note-text" rows="2" placeholder="Short note for this day" maxlength="80"></textarea>
+                  </label>
+                  <div class="button-row">
+                    <button id="add-note" class="btn btn-ghost">Add Note</button>
+                    <button id="remove-note" class="btn btn-danger">Remove Selected</button>
+                  </div>
                 </article>
               </div>
             </section>
@@ -265,13 +280,6 @@
     <template id="todo-item-template">
       <div class="list-row todo-item">
         <input type="text" data-role="text" placeholder="Task" maxlength="80" />
-        <button data-role="remove" class="btn btn-danger">Remove</button>
-      </div>
-    </template>
-
-    <template id="note-item-template">
-      <div class="list-row note-item">
-        <textarea rows="2" data-role="text" placeholder="Short note for this day"></textarea>
         <button data-role="remove" class="btn btn-danger">Remove</button>
       </div>
     </template>

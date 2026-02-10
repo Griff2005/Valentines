@@ -1,4 +1,4 @@
-# Love Board Remote (64x32 RGB Matrix)
+# Lyda Board Remote (64x32 RGB Matrix)
 
 A simple, intuitive website for remotely controlling a **64x32 LED matrix** connected to a Raspberry Pi 4 using:
 

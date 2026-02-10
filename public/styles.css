@@ -377,13 +377,13 @@ textarea {
   align-items: center;
 }
 
-.note-item {
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
+#note-text {
+  min-height: 48px;
 }
 
-.note-item textarea {
-  min-height: 48px;
+.button-row.compact .btn {
+  padding: 6px 10px;
+  font-size: 0.84rem;
 }
 
 .hint {
@@ -471,8 +471,7 @@ canvas {
   }
 
   .calendar-item-top,
-  .todo-item,
-  .note-item {
+  .todo-item {
     grid-template-columns: 1fr;
   }
 }
