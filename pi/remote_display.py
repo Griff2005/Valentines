@@ -449,10 +449,9 @@ def run_widgets(matrix, payload):
             draw_text(canvas, matrix.width - text_width('OFF') - 1, 1, 'OFF', muted_color)
 
         # Bottom-left: todo list gets most of the width
-        draw_text(canvas, 1, 9, 'TODO', title_color)
         todo_items = todo.get('items', []) if todo.get('enabled', True) else []
         todo_style = todo.get('bulletStyle', 'dot')
-        todo_y = 15
+        todo_y = 10
 
         if not todo.get('enabled', True):
             draw_text(canvas, 1, todo_y, 'OFF', muted_color)
@@ -466,18 +465,17 @@ def run_widgets(matrix, payload):
 
         # Bottom-right: one upcoming calendar event.
         panel_x = divider_x + 2
-        draw_text_compact(canvas, panel_x, 9, 'NEXT', title_color)
         if not calendar.get('enabled', True):
-            draw_text_compact(canvas, panel_x, 15, 'OFF', muted_color)
+            draw_text_compact(canvas, panel_x, 18, 'OFF', muted_color)
         else:
             event = next_upcoming_event(calendar.get('events', []))
             if not event:
-                draw_text_compact(canvas, panel_x, 15, 'FREE', muted_color)
+                draw_text_compact(canvas, panel_x, 18, 'FREE', muted_color)
             else:
-                draw_text_compact(canvas, panel_x, 14, event['time'], text_color)
+                draw_text_compact(canvas, panel_x, 12, event['time'], text_color)
                 program, number = split_course_parts(event['title'], 5, 4)
-                draw_text_compact(canvas, panel_x, 20, program or 'CLASS', text_color)
-                draw_text_compact(canvas, panel_x, 26, number or '----', text_color)
+                draw_text_compact(canvas, panel_x, 18, program or 'CLASS', text_color)
+                draw_text_compact(canvas, panel_x, 24, number or '----', text_color)
 
         canvas = matrix.SwapOnVSync(canvas)
         time.sleep(0.25)
@@ -597,7 +595,7 @@ def run_valentine(matrix, payload):
         base_y = 4
         for index, line in enumerate(question_lines):
             line_x = max(0, (matrix.width - text_width(line)) // 2)
-            draw_text(canvas, line_x, base_y + index * 6, line, (255, 220, 240))
+            draw_text(canvas, line_x, base_y + index * 6, line, (255, 40, 40))
 
         # Flower bed near the bottom.
         flower_positions = [

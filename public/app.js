@@ -513,36 +513,32 @@ function drawWidgetPreview(width, height) {
   previewCtx.fillText(weatherText.slice(0, 10), width - 14, 44);
 
   previewCtx.fillStyle = '#ffe082';
-  previewCtx.font = '700 20px Space Grotesk';
-  previewCtx.textAlign = 'left';
-  previewCtx.fillText('TODO', 14, height * 0.34);
-  previewCtx.fillStyle = '#f4f4f4';
   previewCtx.font = '500 18px Space Grotesk';
+  previewCtx.textAlign = 'left';
+  previewCtx.fillStyle = '#f4f4f4';
 
   const bulletSymbol = bulletPreviewSymbol(widgets.todo.bulletStyle || 'dot');
   const todoLines = (widgets.todo.items || []).slice(0, 4);
   todoLines.forEach((item, index) => {
-    previewCtx.fillText(`${bulletSymbol} ${item.text}`.slice(0, 28), 14, height * 0.42 + index * 24);
+    previewCtx.fillText(`${bulletSymbol} ${item.text}`.slice(0, 28), 14, height * 0.38 + index * 24);
   });
 
-  previewCtx.fillStyle = '#ffe082';
   previewCtx.font = '700 18px Space Grotesk';
-  previewCtx.fillText('NEXT', dividerX + 12, height * 0.34);
   previewCtx.fillStyle = '#f4f4f4';
   previewCtx.font = '700 20px Space Grotesk';
   if (!widgets.calendar.enabled) {
-    previewCtx.fillText('OFF', dividerX + 12, height * 0.5);
+    previewCtx.fillText('OFF', dividerX + 12, height * 0.54);
     return;
   }
 
   if (!nextEvent) {
-    previewCtx.fillText('FREE', dividerX + 12, height * 0.5);
+    previewCtx.fillText('FREE', dividerX + 12, height * 0.54);
     return;
   }
 
   const parts = splitCourseParts(nextEvent.title, 5, 4);
-  previewCtx.fillText(nextEvent.time, dividerX + 12, height * 0.46);
-  previewCtx.fillText(parts.program || 'CLASS', dividerX + 12, height * 0.58);
+  previewCtx.fillText(nextEvent.time, dividerX + 12, height * 0.4);
+  previewCtx.fillText(parts.program || 'CLASS', dividerX + 12, height * 0.55);
   previewCtx.fillText(parts.number || '----', dividerX + 12, height * 0.7);
 }
 
@@ -593,13 +589,10 @@ function drawValentinePreview(width, height, sx, sy) {
   const valentine = appState.board.valentine || {};
   const question = (valentine.question || 'Will you be my Valentine?').slice(0, 34);
 
-  const background = previewCtx.createLinearGradient(0, 0, width, height);
-  background.addColorStop(0, '#180015');
-  background.addColorStop(1, '#3f0f31');
-  previewCtx.fillStyle = background;
+  previewCtx.fillStyle = '#000000';
   previewCtx.fillRect(0, 0, width, height);
 
-  previewCtx.fillStyle = '#ffd8f0';
+  previewCtx.fillStyle = '#ff3b30';
   previewCtx.font = '700 34px Space Grotesk';
   previewCtx.textAlign = 'center';
   previewCtx.textBaseline = 'middle';
