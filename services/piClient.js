@@ -185,6 +185,29 @@ async function pushPayload(piConfig, payload) {
   const sudoPrefix = config.useSudo ? 'sudo -n ' : '';
 
   return withConnection(config, async (conn) => {
+    const preflight = await execCommand(
+      conn,
+      `bash -lc "${sudoPrefix}${py} -c 'import rgbmatrix; print(\"__RGBMATRIX__:ok\")'"`
+    );
+
+    const preflightOut = [preflight.stdout, preflight.stderr].filter(Boolean).join('\n');
+    if (!preflightOut.includes('__RGBMATRIX__:ok')) {
+      return {
+        exitCode: preflight.exitCode || 1,
+        stdout: preflight.stdout,
+        stderr: [
+          preflight.stderr,
+          'Python could not import rgbmatrix on the Pi.',
+          'Run: bash ~/Valentines/pi/install_pi_side.sh',
+          'If using "Run renderer with sudo", install must succeed for root python as well.'
+        ]
+          .filter(Boolean)
+          .join('\n'),
+        started: false,
+        status: 'failed'
+      };
+    }
+
     const stopResult = await execCommand(
       conn,
       `bash -lc "pkill -f '${processPattern}' >/dev/null 2>&1 || true"`
