@@ -520,19 +520,81 @@ def draw_flower(canvas, x, y):
     draw_pixel(canvas, x + 1, y + 5, (95, 220, 120))
 
 
-def draw_firework_burst(canvas, x, y, color, twinkle):
-    base_points = [
-        (0, 0),
-        (-1, 0), (1, 0), (0, -1), (0, 1),
-        (-2, 0), (2, 0), (0, -2), (0, 2),
-        (-1, -1), (1, -1), (-1, 1), (1, 1),
-    ]
+def spawn_firework_shell(width, height, lane):
+    if lane == 0:
+        x = random.randint(8, max(8, width // 3))
+    elif lane == 1:
+        x = random.randint(max(10, width // 3), max(12, (2 * width) // 3))
+    else:
+        x = random.randint(max(12, (2 * width) // 3), width - 8)
 
-    extra_points = [(-3, 0), (3, 0), (0, -3), (0, 3)]
-    points = base_points + (extra_points if twinkle else [])
+    angles = [math.radians(step) for step in range(0, 360, 30)]
+    random.shuffle(angles)
 
-    for px, py in points:
-        draw_pixel(canvas, x + px, y + py, color)
+    return {
+        'lane': lane,
+        'x': float(x),
+        'y': float(height - 1),
+        'vx': random.choice([-0.16, -0.08, 0.0, 0.08, 0.16]),
+        'vy': random.uniform(0.92, 1.26),
+        'target_y': random.randint(4, 11),
+        'state': 'launch',
+        'radius': 0.0,
+        'max_radius': random.uniform(3.2, 5.6),
+        'color': random.choice([
+            (255, 145, 210),
+            (255, 215, 120),
+            (120, 220, 255),
+            (255, 170, 185),
+        ]),
+        'angles': angles[: random.choice([8, 10, 12])],
+    }
+
+
+def draw_firework_shell(canvas, shell):
+    x = int(round(shell['x']))
+    y = int(round(shell['y']))
+
+    if shell['state'] == 'launch':
+        draw_pixel(canvas, x, y, (255, 255, 255))
+        draw_pixel(canvas, x, y + 1, (255, 180, 200))
+        draw_pixel(canvas, x, y + 2, (230, 120, 140))
+        return
+
+    radius = float(shell['radius'])
+    max_radius = max(1.0, float(shell['max_radius']))
+    fade = max(0.18, 1.0 - (radius / max_radius))
+    burst_color = scale_color(shell['color'], fade)
+
+    draw_pixel(canvas, x, y, scale_color((255, 240, 250), fade))
+
+    for angle in shell['angles']:
+        px = int(round(shell['x'] + math.cos(angle) * radius))
+        py = int(round(shell['y'] + math.sin(angle) * radius))
+        draw_pixel(canvas, px, py, burst_color)
+
+        if radius > 2.6:
+            tail_x = int(round(shell['x'] + math.cos(angle) * (radius - 1.0)))
+            tail_y = int(round(shell['y'] + math.sin(angle) * (radius - 1.0)))
+            draw_pixel(canvas, tail_x, tail_y, scale_color(burst_color, 0.7))
+
+
+def advance_firework_shell(shell, width, height):
+    if shell['state'] == 'launch':
+        shell['x'] += shell['vx']
+        shell['y'] -= shell['vy']
+        shell['vy'] = max(0.58, shell['vy'] * 0.988)
+        shell['x'] = max(2.0, min(width - 3.0, shell['x']))
+
+        if shell['y'] <= shell['target_y']:
+            shell['state'] = 'explode'
+            shell['radius'] = 0.35
+        return shell
+
+    shell['radius'] += 0.44
+    if shell['radius'] > shell['max_radius']:
+        return spawn_firework_shell(width, height, shell.get('lane', 1))
+    return shell
 
 
 def run_valentine(matrix, payload):
@@ -541,10 +603,9 @@ def run_valentine(matrix, payload):
     fireworks_enabled = bool(config.get('fireworks'))
 
     canvas = matrix.CreateFrameCanvas()
-    pulse = 0.0
+    fireworks = [spawn_firework_shell(matrix.width, matrix.height, lane) for lane in [0, 1, 2]]
 
     while RUNNING:
-        pulse += 0.2
         clear(canvas)
 
         # Soft pink glow band behind the question.
@@ -562,20 +623,21 @@ def run_valentine(matrix, payload):
             line_x = max(0, (matrix.width - text_width(line)) // 2)
             draw_text(canvas, line_x, base_y + index * 6, line, (255, 220, 240))
 
-        # Flower clusters near the bottom.
-        draw_flower(canvas, 7, 22)
-        draw_flower(canvas, 13, 24)
-        draw_flower(canvas, 51, 22)
-        draw_flower(canvas, 57, 24)
+        # Flower bed near the bottom.
+        flower_positions = [
+            (5, 23), (10, 25), (15, 23), (20, 25), (25, 23),
+            (39, 23), (44, 25), (49, 23), (54, 25), (59, 23),
+        ]
+        for fx, fy in flower_positions:
+            draw_flower(canvas, fx, fy)
 
         if fireworks_enabled:
-            twinkle = int(pulse * 2) % 2 == 0
-            draw_firework_burst(canvas, 12, 6, (255, 145, 210), twinkle)
-            draw_firework_burst(canvas, 32, 4, (255, 215, 120), not twinkle)
-            draw_firework_burst(canvas, 52, 7, (120, 220, 255), twinkle)
+            for index, shell in enumerate(fireworks):
+                draw_firework_shell(canvas, shell)
+                fireworks[index] = advance_firework_shell(shell, matrix.width, matrix.height)
 
         canvas = matrix.SwapOnVSync(canvas)
-        time.sleep(0.14)
+        time.sleep(0.09)
 
 
 def draw_rainbow_wave(canvas, phase):

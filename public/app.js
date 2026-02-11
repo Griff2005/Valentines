@@ -85,6 +85,8 @@ let isDrawing = false;
 let eraserActive = false;
 let noteCatalogCache = [];
 let noteSelectionIndex = 0;
+let valentinePreviewPhase = 0;
+let previewTickerStarted = false;
 
 function setStatus(type, text) {
   ids.statusPill.className = 'status-pill';
@@ -598,25 +600,19 @@ function drawPreviewFlower(sx, sy, originX, originY) {
   drawPreviewLedCell(originX + 1, originY + 5, sx, sy, '#67d985');
 }
 
-function drawPreviewFirework(sx, sy, originX, originY, color) {
-  const points = [
-    [0, 0],
-    [-1, 0],
-    [1, 0],
-    [0, -1],
-    [0, 1],
-    [-2, 0],
-    [2, 0],
-    [0, -2],
-    [0, 2],
-    [-1, -1],
-    [1, -1],
-    [-1, 1],
-    [1, 1]
-  ];
+function drawPreviewFirework(sx, sy, originX, originY, color, radius, fade) {
+  const steps = [0, Math.PI / 4, Math.PI / 2, (3 * Math.PI) / 4, Math.PI, (5 * Math.PI) / 4, (3 * Math.PI) / 2, (7 * Math.PI) / 4];
+  const alpha = Math.max(0.25, Math.min(1, fade));
+  const mainColor = color.replace(')', `, ${alpha})`).replace('rgb', 'rgba');
 
-  for (const [px, py] of points) {
-    drawPreviewLedCell(originX + px, originY + py, sx, sy, color);
+  for (const angle of steps) {
+    const px = Math.round(originX + Math.cos(angle) * radius);
+    const py = Math.round(originY + Math.sin(angle) * radius);
+    drawPreviewLedCell(px, py, sx, sy, mainColor);
+  }
+
+  if (radius < 2.2) {
+    drawPreviewLedCell(originX, originY, sx, sy, 'rgba(255, 245, 252, 0.95)');
   }
 }
 
@@ -639,15 +635,31 @@ function drawValentinePreview(width, height, sx, sy) {
   previewCtx.textBaseline = 'middle';
   previewCtx.fillText(question, width / 2, height * 0.28);
 
-  drawPreviewFlower(sx, sy, 6, 24);
-  drawPreviewFlower(sx, sy, 14, 26);
-  drawPreviewFlower(sx, sy, 50, 24);
-  drawPreviewFlower(sx, sy, 58, 26);
+  const flowerPositions = [
+    [5, 23],
+    [10, 25],
+    [15, 23],
+    [20, 25],
+    [25, 23],
+    [39, 23],
+    [44, 25],
+    [49, 23],
+    [54, 25],
+    [59, 23]
+  ];
+  for (const [fx, fy] of flowerPositions) {
+    drawPreviewFlower(sx, sy, fx, fy);
+  }
 
   if (valentine.fireworks) {
-    drawPreviewFirework(sx, sy, 12, 8, '#ff8ece');
-    drawPreviewFirework(sx, sy, 32, 6, '#ffc46a');
-    drawPreviewFirework(sx, sy, 52, 9, '#8fe4ff');
+    const localPhase = valentinePreviewPhase % 24;
+    const radiusA = 0.9 + (localPhase % 8) * 0.55;
+    const radiusB = 1.1 + ((localPhase + 3) % 8) * 0.55;
+    const radiusC = 0.8 + ((localPhase + 6) % 8) * 0.55;
+
+    drawPreviewFirework(sx, sy, 12, 8, 'rgb(255, 142, 206)', radiusA, 1 - radiusA / 6);
+    drawPreviewFirework(sx, sy, 32, 6, 'rgb(255, 196, 106)', radiusB, 1 - radiusB / 6);
+    drawPreviewFirework(sx, sy, 52, 9, 'rgb(143, 228, 255)', radiusC, 1 - radiusC / 6);
   }
 }
 
@@ -793,11 +805,30 @@ function shiftCalendarDay(offsetDays) {
   setCalendarDay(date.toISOString().slice(0, 10));
 }
 
+function startPreviewTicker() {
+  if (previewTickerStarted) {
+    return;
+  }
+
+  previewTickerStarted = true;
+  setInterval(() => {
+    if (!appState) {
+      return;
+    }
+
+    if (activeTab === 'valentine' && appState.board.valentine?.fireworks) {
+      valentinePreviewPhase = (valentinePreviewPhase + 1) % 240;
+      drawPreview();
+    }
+  }, 120);
+}
+
 async function init() {
   setStatus('working', 'Loading saved settings...');
   appState = await api('/api/state');
   populateFormFromState();
   drawPreview();
+  startPreviewTicker();
   setStatus('success', 'Ready. Update controls then click Show Current Tab on Board.');
 }
 
@@ -887,6 +918,7 @@ function registerEvents() {
   ids.valentineFireworks.addEventListener('click', async () => {
     ensureValentineState();
     appState.board.valentine.fireworks = true;
+    valentinePreviewPhase = 0;
     drawPreview();
 
     try {
