@@ -136,6 +136,12 @@ function normalizeState(inputState) {
   note.catalog = sanitizeNoteCatalog(note);
   delete note.text;
 
+  const valentine = merged.board.valentine || {};
+  merged.board.valentine = {
+    question: String(valentine.question || '').trim().slice(0, 80) || 'Will you be my Valentine?',
+    fireworks: Boolean(valentine.fireworks)
+  };
+
   return merged;
 }
 

@@ -18,6 +18,10 @@ A simple, intuitive website for remotely controlling a **64x32 LED matrix** conn
   - Color + speed + effect (scroll/pulse/static)
 - Animation mode:
   - Rainbow Wave, Heart Beat, Sparkles, Color Wipe
+- Valentine mode:
+  - "Will you be my Valentine?" prompt
+  - Pink flower pixel art
+  - Optional fireworks button
 - Pixel Painter mode:
   - 64x32 draw canvas
   - Eraser, clear, fill

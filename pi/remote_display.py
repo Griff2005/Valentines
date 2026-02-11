@@ -410,6 +410,7 @@ def run_widgets(matrix, payload):
         clock_x = 1
         draw_text_compact(canvas, clock_x, 1, clock_text, (255, 242, 194))
         clock_end = clock_x + compact_text_width(clock_text) + 2
+        min_weather_x = clock_end + 8
 
         if note.get('enabled', True):
             daily_note = pick_daily_note(note.get('catalog', []))
@@ -436,30 +437,30 @@ def run_widgets(matrix, payload):
             gap = 2
             weather_x = note_x - (compact_text_width(draw_temp_text) + 1 + icon_width) - gap
 
-            if weather_x < clock_end and note.get('enabled', True) and len(note_text) > 3:
+            if weather_x < min_weather_x and note.get('enabled', True) and len(note_text) > 3:
                 note_text = fit_text(daily_note, 3)
                 note_width = compact_text_width(note_text)
                 note_x = matrix.width - note_width - 1
                 weather_x = note_x - (compact_text_width(draw_temp_text) + 1 + icon_width) - gap
 
-            if weather_x < clock_end:
+            if weather_x < min_weather_x:
                 draw_temp_text = temp_text_short
                 weather_x = note_x - (compact_text_width(draw_temp_text) + 1 + icon_width) - gap
 
-            if weather_x < clock_end and note.get('enabled', True) and len(note_text) > 2:
+            if weather_x < min_weather_x and note.get('enabled', True) and len(note_text) > 2:
                 note_text = fit_text(daily_note, 2)
                 note_width = compact_text_width(note_text)
                 note_x = matrix.width - note_width - 1
                 weather_x = note_x - (compact_text_width(draw_temp_text) + 1 + icon_width) - gap
 
-            if weather_x < clock_end:
-                weather_x = clock_end
+            if weather_x < min_weather_x:
+                weather_x = min_weather_x
 
             icon_x = weather_x + compact_text_width(draw_temp_text) + 1
             draw_text_compact(canvas, weather_x, 1, draw_temp_text, (155, 236, 255))
             draw_weather_icon(canvas, icon_x, 1, icon_name)
         else:
-            draw_text_compact(canvas, clock_end, 1, 'OFF', muted_color)
+            draw_text_compact(canvas, min_weather_x, 1, 'OFF', muted_color)
 
         # Top-right: short daily note rotated from catalog
         draw_text_compact(canvas, note_x, 1, note_text, note_color)
@@ -498,6 +499,83 @@ def run_widgets(matrix, payload):
 
         canvas = matrix.SwapOnVSync(canvas)
         time.sleep(0.25)
+
+
+def draw_flower(canvas, x, y):
+    petals = [
+        (x, y - 2),
+        (x - 2, y),
+        (x + 2, y),
+        (x, y + 2),
+        (x, y),
+    ]
+    for px, py in petals:
+        draw_pixel(canvas, px, py, (255, 105, 180))
+    draw_pixel(canvas, x, y, (255, 225, 245))
+
+    for step in range(1, 5):
+        draw_pixel(canvas, x, y + 2 + step, (70, 190, 90))
+
+    draw_pixel(canvas, x - 1, y + 4, (95, 220, 120))
+    draw_pixel(canvas, x + 1, y + 5, (95, 220, 120))
+
+
+def draw_firework_burst(canvas, x, y, color, twinkle):
+    base_points = [
+        (0, 0),
+        (-1, 0), (1, 0), (0, -1), (0, 1),
+        (-2, 0), (2, 0), (0, -2), (0, 2),
+        (-1, -1), (1, -1), (-1, 1), (1, 1),
+    ]
+
+    extra_points = [(-3, 0), (3, 0), (0, -3), (0, 3)]
+    points = base_points + (extra_points if twinkle else [])
+
+    for px, py in points:
+        draw_pixel(canvas, x + px, y + py, color)
+
+
+def run_valentine(matrix, payload):
+    config = payload.get('valentine', {})
+    question = str(config.get('question') or 'Will you be my Valentine?')
+    fireworks_enabled = bool(config.get('fireworks'))
+
+    canvas = matrix.CreateFrameCanvas()
+    pulse = 0.0
+
+    while RUNNING:
+        pulse += 0.2
+        clear(canvas)
+
+        # Soft pink glow band behind the question.
+        for y in range(0, 12):
+            factor = max(0.0, 1.0 - (y / 14.0))
+            color = scale_color((120, 30, 90), factor)
+            draw_hline(canvas, 0, matrix.width - 1, y, color)
+
+        question_lines = wrap_text(question, 15, 3)
+        if not question_lines:
+            question_lines = ['Will you be my', 'Valentine?']
+
+        base_y = 4
+        for index, line in enumerate(question_lines):
+            line_x = max(0, (matrix.width - text_width(line)) // 2)
+            draw_text(canvas, line_x, base_y + index * 6, line, (255, 220, 240))
+
+        # Flower clusters near the bottom.
+        draw_flower(canvas, 7, 22)
+        draw_flower(canvas, 13, 24)
+        draw_flower(canvas, 51, 22)
+        draw_flower(canvas, 57, 24)
+
+        if fireworks_enabled:
+            twinkle = int(pulse * 2) % 2 == 0
+            draw_firework_burst(canvas, 12, 6, (255, 145, 210), twinkle)
+            draw_firework_burst(canvas, 32, 4, (255, 215, 120), not twinkle)
+            draw_firework_burst(canvas, 52, 7, (120, 220, 255), twinkle)
+
+        canvas = matrix.SwapOnVSync(canvas)
+        time.sleep(0.14)
 
 
 def draw_rainbow_wave(canvas, phase):
@@ -650,6 +728,8 @@ def main():
     try:
         if mode == 'widgets':
             run_widgets(matrix, payload)
+        elif mode == 'valentine':
+            run_valentine(matrix, payload)
         elif mode == 'animation':
             run_animation(matrix, payload)
         elif mode == 'pixels':

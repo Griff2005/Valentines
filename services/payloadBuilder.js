@@ -182,6 +182,20 @@ function buildPixelsPayload(state) {
   };
 }
 
+function buildValentinePayload(state) {
+  const valentine = state.board.valentine || {};
+
+  return {
+    mode: 'valentine',
+    brightness: clampNumber(state.board.brightness, 10, 100, 70),
+    matrixOptions: buildMatrixOptions(state),
+    valentine: {
+      question: String(valentine.question || '').trim().slice(0, 80) || 'Will you be my Valentine?',
+      fireworks: Boolean(valentine.fireworks)
+    }
+  };
+}
+
 async function buildPayload(state, mode, getWeather) {
   const selectedMode = mode || state.board.mode;
 
@@ -199,6 +213,10 @@ async function buildPayload(state, mode, getWeather) {
 
   if (selectedMode === 'pixels') {
     return buildPixelsPayload(state);
+  }
+
+  if (selectedMode === 'valentine') {
+    return buildValentinePayload(state);
   }
 
   throw new Error(`Unsupported board mode: ${selectedMode}`);

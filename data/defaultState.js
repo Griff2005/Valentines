@@ -63,6 +63,10 @@ const defaultState = {
       preset: 'rainbowWave',
       speed: 35
     },
+    valentine: {
+      question: 'Will you be my Valentine?',
+      fireworks: false
+    },
     pixels: {
       data: createBlankPixels(),
       background: '#000000'

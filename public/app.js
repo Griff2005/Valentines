@@ -61,6 +61,9 @@ const ids = {
   animationSpeed: document.getElementById('animation-speed'),
   animationSpeedValue: document.getElementById('animation-speed-value'),
 
+  valentineQuestion: document.getElementById('valentine-question'),
+  valentineFireworks: document.getElementById('valentine-fireworks'),
+
   pixelColor: document.getElementById('pixel-color'),
   pixelErase: document.getElementById('pixel-erase'),
   pixelClear: document.getElementById('pixel-clear'),
@@ -141,6 +144,20 @@ function ensurePixels() {
   if (!Array.isArray(appState.board.pixels.data) || appState.board.pixels.data.length !== BOARD_WIDTH * BOARD_HEIGHT) {
     appState.board.pixels.data = createEmptyPixels();
   }
+}
+
+function ensureValentineState() {
+  if (!appState.board.valentine || typeof appState.board.valentine !== 'object') {
+    appState.board.valentine = {
+      question: 'Will you be my Valentine?',
+      fireworks: false
+    };
+    return;
+  }
+
+  appState.board.valentine.question =
+    String(appState.board.valentine.question || '').trim().slice(0, 80) || 'Will you be my Valentine?';
+  appState.board.valentine.fireworks = Boolean(appState.board.valentine.fireworks);
 }
 
 function safeDate(value) {
@@ -334,6 +351,8 @@ function collectNotes() {
 }
 
 function populateFormFromState() {
+  ensureValentineState();
+
   ids.piHost.value = appState.pi.host || '';
   ids.piPort.value = String(appState.pi.port || 22);
   ids.piUser.value = appState.pi.username || '';
@@ -375,6 +394,8 @@ function populateFormFromState() {
   ids.animationSpeed.value = String(appState.board.animation.speed || 35);
   ids.animationSpeedValue.textContent = ids.animationSpeed.value;
 
+  ids.valentineQuestion.value = appState.board.valentine?.question || 'Will you be my Valentine?';
+
   ensurePixels();
   drawPixelCanvas();
 }
@@ -383,6 +404,8 @@ function syncStateFromForm() {
   if (!appState) {
     return;
   }
+
+  ensureValentineState();
 
   appState.pi.host = ids.piHost.value.trim();
   appState.pi.port = Number(ids.piPort.value) || 22;
@@ -416,6 +439,9 @@ function syncStateFromForm() {
 
   appState.board.animation.preset = ids.animationPreset.value;
   appState.board.animation.speed = Number(ids.animationSpeed.value) || 35;
+
+  appState.board.valentine.question =
+    ids.valentineQuestion.value.trim().slice(0, 80) || 'Will you be my Valentine?';
 
   ids.brightnessValue.textContent = String(appState.board.brightness);
   ids.messageSpeedValue.textContent = String(appState.board.message.speed);
@@ -545,6 +571,86 @@ function drawWidgetPreview(width, height) {
   });
 }
 
+function drawPreviewLedCell(x, y, sx, sy, color) {
+  previewCtx.fillStyle = color;
+  previewCtx.fillRect(Math.floor(x * sx), Math.floor(y * sy), Math.ceil(sx), Math.ceil(sy));
+}
+
+function drawPreviewFlower(sx, sy, originX, originY) {
+  const petals = [
+    [0, -2],
+    [-2, 0],
+    [0, 0],
+    [2, 0],
+    [0, 2]
+  ];
+
+  for (const [px, py] of petals) {
+    drawPreviewLedCell(originX + px, originY + py, sx, sy, '#ff6fb5');
+  }
+  drawPreviewLedCell(originX, originY, sx, sy, '#ffd3eb');
+
+  for (let step = 1; step <= 4; step += 1) {
+    drawPreviewLedCell(originX, originY + 2 + step, sx, sy, '#4cc26e');
+  }
+
+  drawPreviewLedCell(originX - 1, originY + 4, sx, sy, '#67d985');
+  drawPreviewLedCell(originX + 1, originY + 5, sx, sy, '#67d985');
+}
+
+function drawPreviewFirework(sx, sy, originX, originY, color) {
+  const points = [
+    [0, 0],
+    [-1, 0],
+    [1, 0],
+    [0, -1],
+    [0, 1],
+    [-2, 0],
+    [2, 0],
+    [0, -2],
+    [0, 2],
+    [-1, -1],
+    [1, -1],
+    [-1, 1],
+    [1, 1]
+  ];
+
+  for (const [px, py] of points) {
+    drawPreviewLedCell(originX + px, originY + py, sx, sy, color);
+  }
+}
+
+function drawValentinePreview(width, height, sx, sy) {
+  const valentine = appState.board.valentine || {};
+  const question = (valentine.question || 'Will you be my Valentine?').slice(0, 34);
+
+  const background = previewCtx.createLinearGradient(0, 0, width, height);
+  background.addColorStop(0, '#180015');
+  background.addColorStop(1, '#3f0f31');
+  previewCtx.fillStyle = background;
+  previewCtx.fillRect(0, 0, width, height);
+
+  previewCtx.fillStyle = 'rgba(255, 190, 230, 0.22)';
+  previewCtx.fillRect(0, 0, width, 64);
+
+  previewCtx.fillStyle = '#ffd8f0';
+  previewCtx.font = '700 34px Space Grotesk';
+  previewCtx.textAlign = 'center';
+  previewCtx.textBaseline = 'middle';
+  previewCtx.fillText(question, width / 2, height * 0.28);
+
+  drawPreviewFlower(sx, sy, 6, 24);
+  drawPreviewFlower(sx, sy, 14, 26);
+  drawPreviewFlower(sx, sy, 50, 24);
+  drawPreviewFlower(sx, sy, 58, 26);
+
+  if (valentine.fireworks) {
+    drawPreviewFirework(sx, sy, 12, 8, '#ff8ece');
+    drawPreviewFirework(sx, sy, 32, 6, '#ffc46a');
+    drawPreviewFirework(sx, sy, 52, 9, '#8fe4ff');
+  }
+}
+
 function drawPreview() {
   if (!appState) {
     return;
@@ -594,6 +700,11 @@ function drawPreview() {
     previewCtx.textBaseline = 'middle';
     const text = (appState.board.message.text || 'Message').slice(0, 40);
     previewCtx.fillText(text, w / 2, h / 2);
+    return;
+  }
+
+  if (activeTab === 'valentine') {
+    drawValentinePreview(w, h, sx, sy);
     return;
   }
 
@@ -773,6 +884,18 @@ function registerEvents() {
     }
   });
 
+  ids.valentineFireworks.addEventListener('click', async () => {
+    ensureValentineState();
+    appState.board.valentine.fireworks = true;
+    drawPreview();
+
+    try {
+      await pushMode('valentine');
+    } catch (error) {
+      setStatus('error', error.message);
+    }
+  });
+
   ids.importIcs.addEventListener('click', async () => {
     try {
       await importCalendarDayFromIcs();
@@ -897,6 +1020,7 @@ function registerEvents() {
     ids.messageSpeed,
     ids.animationPreset,
     ids.animationSpeed,
+    ids.valentineQuestion,
     ids.brightness
   ].forEach((element) => {
     element.addEventListener('input', () => {

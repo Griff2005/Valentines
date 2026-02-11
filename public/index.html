@@ -104,6 +104,7 @@
               <button class="tab is-active" data-tab="widgets">Widgets</button>
               <button class="tab" data-tab="message">Full Message</button>
               <button class="tab" data-tab="animation">Animation</button>
+              <button class="tab" data-tab="valentine">Valentine Mode</button>
               <button class="tab" data-tab="pixels">Pixel Painter</button>
             </div>
 
@@ -242,6 +243,21 @@
                 <span>Speed <strong id="animation-speed-value">35</strong></span>
                 <input id="animation-speed" type="range" min="10" max="100" value="35" />
               </label>
+            </section>
+
+            <section id="tab-valentine" class="tab-panel">
+              <h3>Valentine Mode</h3>
+              <p class="card-help">Shows the Valentine question with pink flower pixel art.</p>
+
+              <label>
+                <span>Question</span>
+                <input id="valentine-question" type="text" maxlength="80" placeholder="Will you be my Valentine?" />
+              </label>
+
+              <div class="button-row">
+                <button id="valentine-fireworks" class="btn btn-secondary">Show Fireworks</button>
+              </div>
+              <p class="hint">Press once to add fireworks pixel art to this mode.</p>
             </section>
 
             <section id="tab-pixels" class="tab-panel">
