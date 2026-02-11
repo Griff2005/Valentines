@@ -322,6 +322,44 @@ function mergeCalendarEvents(existingEvents, incomingEvents) {
   };
 }
 
+function eventsForCalendarDay(events, date) {
+  const selectedDay = safeDate(date) || todayDateString();
+  return sortCalendarEvents(
+    (Array.isArray(events) ? events : []).filter((event) => safeDate(event?.date) === selectedDay)
+  );
+}
+
+function mergeCalendarStateWithVisibleDay(allEvents, visibleDayEvents, selectedDay) {
+  const day = safeDate(selectedDay) || todayDateString();
+  const mergedBySlot = new Map();
+
+  for (const rawEvent of Array.isArray(allEvents) ? allEvents : []) {
+    const event = normalizeCalendarEventForMerge(rawEvent, 'manual');
+    if (!event || event.date === day) {
+      continue;
+    }
+    mergedBySlot.set(calendarSlotKey(event), event);
+  }
+
+  for (const rawEvent of Array.isArray(visibleDayEvents) ? visibleDayEvents : []) {
+    const event = normalizeCalendarEventForMerge(rawEvent, 'manual');
+    if (!event) {
+      continue;
+    }
+    mergedBySlot.set(calendarSlotKey(event), event);
+  }
+
+  return sortCalendarEvents(Array.from(mergedBySlot.values()));
+}
+
+function renderCalendarEventsForSelectedDay() {
+  const selectedDay = safeDate(ids.calendarDay.value) || todayDateString();
+  const allEvents = Array.isArray(appState?.board?.widgets?.calendar?.events)
+    ? appState.board.widgets.calendar.events
+    : [];
+  renderCalendarEvents(eventsForCalendarDay(allEvents, selectedDay));
+}
+
 function renderCalendarEvents(events) {
   ids.calendarEvents.innerHTML = '';
 
@@ -372,11 +410,11 @@ function renderTodoItems(items) {
   }
 }
 
-function collectCalendarEvents() {
+function collectCalendarEvents(selectedDay = safeDate(ids.calendarDay.value) || todayDateString()) {
   const rows = Array.from(ids.calendarEvents.querySelectorAll('.calendar-item'));
   return rows
     .map((row) => ({
-      date: safeDate(row.querySelector('[data-role="date"]').value),
+      date: safeDate(row.querySelector('[data-role="date"]').value) || selectedDay,
       time: safeTime(row.querySelector('[data-role="time"]').value) || '00:00',
       title: row.querySelector('[data-role="title"]').value.trim(),
       source: row.dataset.source || 'manual'
@@ -417,7 +455,7 @@ function populateFormFromState() {
 
   ids.calendarEnabled.checked = Boolean(widgets.calendar.enabled);
   ids.calendarDay.value = safeDate(widgets.calendar.selectedDate) || todayDateString();
-  renderCalendarEvents(widgets.calendar.events || []);
+  renderCalendarEventsForSelectedDay();
 
   ids.todoEnabled.checked = Boolean(widgets.todo.enabled);
   ids.todoBulletStyle.value = widgets.todo.bulletStyle || 'dot';
@@ -461,8 +499,13 @@ function syncStateFromForm() {
   appState.board.widgets.weather.unit = ids.weatherUnit.value;
 
   appState.board.widgets.calendar.enabled = ids.calendarEnabled.checked;
-  appState.board.widgets.calendar.selectedDate = safeDate(ids.calendarDay.value) || todayDateString();
-  appState.board.widgets.calendar.events = collectCalendarEvents();
+  const selectedCalendarDay = safeDate(ids.calendarDay.value) || todayDateString();
+  appState.board.widgets.calendar.selectedDate = selectedCalendarDay;
+  appState.board.widgets.calendar.events = mergeCalendarStateWithVisibleDay(
+    appState.board.widgets.calendar.events,
+    collectCalendarEvents(selectedCalendarDay),
+    selectedCalendarDay
+  );
 
   appState.board.widgets.todo.enabled = ids.todoEnabled.checked;
   appState.board.widgets.todo.bulletStyle = ids.todoBulletStyle.value;
@@ -818,9 +861,21 @@ async function autoSyncCalendarFromCsv() {
 }
 
 function setCalendarDay(value) {
-  const safeValue = safeDate(value) || todayDateString();
-  ids.calendarDay.value = safeValue;
+  if (!appState) {
+    return;
+  }
+
+  const previousDay = safeDate(appState.board.widgets.calendar.selectedDate) || todayDateString();
+  const nextDay = safeDate(value) || todayDateString();
+
+  // Persist edits for the day currently rendered in the list before switching views.
+  ids.calendarDay.value = previousDay;
+  appState.board.widgets.calendar.selectedDate = previousDay;
   syncStateFromForm();
+
+  ids.calendarDay.value = nextDay;
+  appState.board.widgets.calendar.selectedDate = nextDay;
+  renderCalendarEventsForSelectedDay();
   drawPreview();
 }
 
@@ -991,12 +1046,16 @@ function registerEvents() {
     shiftCalendarDay(7);
   });
 
+  ids.calendarDay.addEventListener('change', () => {
+    setCalendarDay(ids.calendarDay.value);
+  });
+
   ids.addEvent.addEventListener('click', () => {
-    const date = safeDate(ids.calendarDay.value) || todayDateString();
+    const selectedDay = safeDate(ids.calendarDay.value) || todayDateString();
     renderCalendarEvents([
-      ...collectCalendarEvents(),
+      ...collectCalendarEvents(selectedDay),
       {
-        date,
+        date: selectedDay,
         time: '09:00',
         title: '',
         source: 'manual'
@@ -1035,7 +1094,6 @@ function registerEvents() {
     ids.weatherCity,
     ids.weatherUnit,
     ids.calendarEnabled,
-    ids.calendarDay,
     ids.todoEnabled,
     ids.todoBulletStyle,
     ids.messageText,

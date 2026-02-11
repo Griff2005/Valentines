@@ -11,16 +11,25 @@ function mapWeatherCode(code) {
     51: 'Drizzle',
     53: 'Drizzle',
     55: 'Drizzle',
+    56: 'Freezing drizzle',
+    57: 'Freezing drizzle',
     61: 'Rain',
     63: 'Rain',
     65: 'Rain',
+    66: 'Freezing rain',
+    67: 'Freezing rain',
     71: 'Snow',
     73: 'Snow',
     75: 'Snow',
+    77: 'Snow',
     80: 'Showers',
     81: 'Showers',
     82: 'Showers',
-    95: 'Thunder'
+    85: 'Snow showers',
+    86: 'Snow showers',
+    95: 'Thunder',
+    96: 'Thunder',
+    99: 'Thunder'
   };
 
   return map[code] || 'Weather';
@@ -43,15 +52,101 @@ function mapWeatherIcon(code) {
     return 'rain';
   }
 
-  if ([71, 73, 75].includes(code)) {
+  if ([56, 57, 66, 67, 71, 73, 75, 77, 85, 86].includes(code)) {
     return 'snow';
   }
 
-  if (code === 95) {
+  if ([95, 96, 99].includes(code)) {
     return 'storm';
   }
 
   return 'cloud';
+}
+
+function parseLocationQuery(city) {
+  const trimmed = String(city || '').trim();
+  if (!trimmed) {
+    throw new Error('City is required for weather lookup.');
+  }
+
+  const parts = trimmed.split(',').map((part) => part.trim()).filter(Boolean);
+  const name = parts[0] || trimmed;
+  const hintTokens = parts
+    .slice(1)
+    .flatMap((part) => part.toLowerCase().split(/[\s/]+/).filter(Boolean));
+
+  return {
+    raw: trimmed,
+    name,
+    hintTokens
+  };
+}
+
+function inferCountryCode(hintTokens) {
+  const hints = new Set(hintTokens.map((token) => token.toLowerCase()));
+  if (hints.has('canada') || hints.has('ca') || hints.has('ontario') || hints.has('on')) {
+    return 'CA';
+  }
+  if (hints.has('usa') || hints.has('us') || hints.has('united') || hints.has('states')) {
+    return 'US';
+  }
+  return '';
+}
+
+function scorePlace(place, queryName, hintTokens) {
+  const name = String(place?.name || '').toLowerCase();
+  const admin1 = String(place?.admin1 || '').toLowerCase();
+  const admin2 = String(place?.admin2 || '').toLowerCase();
+  const country = String(place?.country || '').toLowerCase();
+  const countryCode = String(place?.country_code || '').toUpperCase();
+  const text = `${name} ${admin1} ${admin2} ${country} ${countryCode.toLowerCase()}`;
+  const query = String(queryName || '').trim().toLowerCase();
+
+  let score = 0;
+  if (query && name === query) {
+    score += 70;
+  } else if (query && name.startsWith(query)) {
+    score += 35;
+  } else if (query && text.includes(query)) {
+    score += 15;
+  }
+
+  for (const token of hintTokens) {
+    if (!token) {
+      continue;
+    }
+
+    if (token === 'ontario' && admin1 === 'ontario') {
+      score += 120;
+      continue;
+    }
+
+    if (token === 'canada' && countryCode === 'CA') {
+      score += 90;
+      continue;
+    }
+
+    if (token === 'ca' && countryCode === 'CA') {
+      score += 40;
+      continue;
+    }
+
+    if (token === 'on' && admin1 === 'ontario') {
+      score += 35;
+      continue;
+    }
+
+    if (text.includes(token)) {
+      score += 12;
+    }
+  }
+
+  const population = Number(place?.population);
+  if (Number.isFinite(population) && population > 0) {
+    score += Math.min(20, Math.log10(population));
+  }
+
+  return score;
 }
 
 async function fetchJson(url) {
@@ -63,26 +158,32 @@ async function fetchJson(url) {
 }
 
 async function geocodeCity(city) {
-  const trimmed = String(city || '').trim();
-  if (!trimmed) {
-    throw new Error('City is required for weather lookup.');
-  }
+  const parsed = parseLocationQuery(city);
+  const countryCode = inferCountryCode(parsed.hintTokens);
 
   const geoUrl = new URL('https://geocoding-api.open-meteo.com/v1/search');
-  geoUrl.searchParams.set('name', trimmed);
-  geoUrl.searchParams.set('count', '1');
+  geoUrl.searchParams.set('name', parsed.name);
+  geoUrl.searchParams.set('count', '20');
   geoUrl.searchParams.set('language', 'en');
   geoUrl.searchParams.set('format', 'json');
+  if (countryCode) {
+    geoUrl.searchParams.set('countryCode', countryCode);
+  }
 
   const geoData = await fetchJson(geoUrl.toString());
-  const place = geoData.results?.[0];
+  const results = Array.isArray(geoData.results) ? geoData.results : [];
+  const place = results.length <= 1
+    ? results[0]
+    : [...results].sort((left, right) => (
+      scorePlace(right, parsed.name, parsed.hintTokens) - scorePlace(left, parsed.name, parsed.hintTokens)
+    ))[0];
 
   if (!place) {
-    throw new Error(`Could not find city: ${trimmed}`);
+    throw new Error(`Could not find city: ${parsed.raw}`);
   }
 
   return {
-    name: place.name,
+    name: [place.name, place.admin1].filter(Boolean).join(', ') || place.name,
     latitude: place.latitude,
     longitude: place.longitude
   };
@@ -100,6 +201,7 @@ async function getCurrentWeather({ city, unit }) {
     'temperature_unit',
     normalizedUnit === 'C' ? 'celsius' : 'fahrenheit'
   );
+  weatherUrl.searchParams.set('timezone', 'auto');
 
   const weatherData = await fetchJson(weatherUrl.toString());
   const current = weatherData.current;
