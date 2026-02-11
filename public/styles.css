@@ -377,10 +377,6 @@ textarea {
   align-items: center;
 }
 
-#note-text {
-  min-height: 48px;
-}
-
 .button-row.compact .btn {
   padding: 6px 10px;
   font-size: 0.84rem;

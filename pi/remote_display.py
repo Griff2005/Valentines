@@ -10,10 +10,11 @@ import base64
 import json
 import math
 import random
+import re
 import signal
 import sys
 import time
-from datetime import date, datetime
+from datetime import datetime
 
 from rgbmatrix import RGBMatrix, RGBMatrixOptions  # type: ignore
 
@@ -288,13 +289,6 @@ def fit_text(value, max_chars):
     return text[:max_chars]
 
 
-def pick_daily_note(catalog):
-    notes = [str(note or '').strip() for note in catalog if str(note or '').strip()]
-    if not notes:
-        return ''
-    return notes[date.today().toordinal() % len(notes)]
-
-
 def draw_weather_icon(canvas, x, y, icon_name):
     icon = str(icon_name or 'cloud').lower()
 
@@ -355,32 +349,47 @@ def format_event_time(value):
     return '00:00'
 
 
-def upcoming_events(events):
+def format_course_code(value, max_chars=5):
+    text = str(value or '').strip().upper()
+    if not text:
+        return ''
+
+    structured = re.search(r'[A-Z]{2,}\s*\d{2,}', text)
+    if structured:
+        return re.sub(r'\s+', '', structured.group(0))[:max_chars]
+
+    compact = re.sub(r'[^A-Z0-9]', '', text)
+    return compact[:max_chars]
+
+
+def next_upcoming_event(events):
     now = datetime.now()
-    today = now.strftime('%Y-%m-%d')
-    current_minutes = now.hour * 60 + now.minute
-    valid = []
+    nearest = None
 
     for event in events:
-        if str(event.get('date') or '').strip() != today:
-            continue
-
+        date_text = str(event.get('date') or '').strip()
         time_text = format_event_time(event.get('time'))
-        try:
-            minutes = int(time_text[:2]) * 60 + int(time_text[3:5])
-        except ValueError:
-            minutes = 0
+        title_text = str(event.get('title') or '').strip()
 
-        if minutes < current_minutes:
+        if not date_text or not title_text:
             continue
 
-        valid.append({
-            'time': time_text,
-            'title': str(event.get('title') or '').strip()
-        })
+        try:
+            when = datetime.strptime(f'{date_text} {time_text}', '%Y-%m-%d %H:%M')
+        except ValueError:
+            continue
 
-    valid.sort(key=lambda item: item['time'])
-    return valid
+        if when < now:
+            continue
+
+        if nearest is None or when < nearest['when']:
+            nearest = {
+                'when': when,
+                'time': time_text,
+                'title': title_text
+            }
+
+    return nearest
 
 
 def run_widgets(matrix, payload):
@@ -388,12 +397,12 @@ def run_widgets(matrix, payload):
     weather = widgets.get('weather', {})
     calendar = widgets.get('calendar', {})
     todo = widgets.get('todo', {})
-    note = widgets.get('note', {})
 
     border = (40, 96, 118)
     title_color = (255, 210, 100)
     text_color = (214, 235, 255)
     muted_color = (130, 150, 166)
+    divider_x = 47
 
     canvas = matrix.CreateFrameCanvas()
 
@@ -401,72 +410,38 @@ def run_widgets(matrix, payload):
         clear(canvas)
 
         draw_hline(canvas, 0, matrix.width - 1, 7, border)
-        draw_vline(canvas, 31, 8, matrix.height - 1, border)
+        draw_vline(canvas, divider_x, 8, matrix.height - 1, border)
 
-        # Top-left: live time + date + weather (compact spacing)
+        # Top row: live time + date + weather
         now = datetime.now()
         time_text = f"{now.hour}:{now.minute:02d}"
-        date_text = f"{now.strftime('%b')} {now.day}"
+        date_text = f"{now.strftime('%b').upper()} {now.day}"
         clock_text = f"{time_text} {date_text}"
-        clock_x = 1
-        draw_text_compact(canvas, clock_x, 1, clock_text, (255, 242, 194))
-        clock_end = clock_x + compact_text_width(clock_text) + 2
-        min_weather_x = clock_end + 8
-
-        if note.get('enabled', True):
-            daily_note = pick_daily_note(note.get('catalog', []))
-            note_color = (255, 195, 143)
-            note_text = fit_text(daily_note, 4)
-        else:
-            note_color = muted_color
-            note_text = 'OFF'
-
-        note_width = compact_text_width(note_text)
-        note_x = matrix.width - note_width - 1
 
         if weather.get('enabled', True):
             temp_value = str(weather.get('temp', '--')).strip()
             unit_value = str(weather.get('unit', 'F')).strip()
-            temp_text_full = fit_text(f"{temp_value}{unit_value}", 4)
-            temp_text_short = fit_text(temp_value, 3)
-            draw_temp_text = temp_text_full
+            draw_temp_text = fit_text(f"{temp_value}{unit_value}", 4)
             icon_name = str(weather.get('icon', 'cloud') or 'cloud')
             if icon_name.lower() == 'sun' and (now.hour < 6 or now.hour >= 18):
                 icon_name = 'moon'
+            weather_block_width = text_width(draw_temp_text) + 1 + 5
+            weather_x = matrix.width - weather_block_width - 1
+            if weather_x <= 1 + text_width(clock_text) + 1:
+                short_date = f"{now.strftime('%b').upper()}{now.day}"
+                clock_text = f"{time_text} {short_date}"
+            if weather_x <= 1 + text_width(clock_text) + 1:
+                clock_text = time_text
 
-            icon_width = 5
-            gap = 2
-            weather_x = note_x - (compact_text_width(draw_temp_text) + 1 + icon_width) - gap
-
-            if weather_x < min_weather_x and note.get('enabled', True) and len(note_text) > 3:
-                note_text = fit_text(daily_note, 3)
-                note_width = compact_text_width(note_text)
-                note_x = matrix.width - note_width - 1
-                weather_x = note_x - (compact_text_width(draw_temp_text) + 1 + icon_width) - gap
-
-            if weather_x < min_weather_x:
-                draw_temp_text = temp_text_short
-                weather_x = note_x - (compact_text_width(draw_temp_text) + 1 + icon_width) - gap
-
-            if weather_x < min_weather_x and note.get('enabled', True) and len(note_text) > 2:
-                note_text = fit_text(daily_note, 2)
-                note_width = compact_text_width(note_text)
-                note_x = matrix.width - note_width - 1
-                weather_x = note_x - (compact_text_width(draw_temp_text) + 1 + icon_width) - gap
-
-            if weather_x < min_weather_x:
-                weather_x = min_weather_x
-
-            icon_x = weather_x + compact_text_width(draw_temp_text) + 1
-            draw_text_compact(canvas, weather_x, 1, draw_temp_text, (155, 236, 255))
+            draw_text(canvas, 1, 1, clock_text, (255, 242, 194))
+            icon_x = weather_x + text_width(draw_temp_text) + 1
+            draw_text(canvas, weather_x, 1, draw_temp_text, (155, 236, 255))
             draw_weather_icon(canvas, icon_x, 1, icon_name)
         else:
-            draw_text_compact(canvas, min_weather_x, 1, 'OFF', muted_color)
+            draw_text(canvas, 1, 1, clock_text, (255, 242, 194))
+            draw_text(canvas, matrix.width - text_width('OFF') - 1, 1, 'OFF', muted_color)
 
-        # Top-right: short daily note rotated from catalog
-        draw_text_compact(canvas, note_x, 1, note_text, note_color)
-
-        # Bottom-left: todo list with bullet styles
+        # Bottom-left: todo list gets most of the width
         draw_text(canvas, 1, 9, 'TODO', title_color)
         todo_items = todo.get('items', []) if todo.get('enabled', True) else []
         todo_style = todo.get('bulletStyle', 'dot')
@@ -479,24 +454,22 @@ def run_widgets(matrix, payload):
         else:
             for item in todo_items[:3]:
                 draw_todo_bullet(canvas, 1, todo_y, todo_style)
-                draw_text(canvas, 7, todo_y, fit_text(item.get('text', ''), 6), text_color)
+                draw_text(canvas, 7, todo_y, fit_text(item.get('text', ''), 10), text_color)
                 todo_y += 6
 
-        # Bottom-right: today's calendar events
-        draw_text(canvas, 33, 9, 'DAY', title_color)
-        day_events = upcoming_events(calendar.get('events', [])) if calendar.get('enabled', True) else []
-        cal_y = 15
-
+        # Bottom-right: one upcoming calendar event (time + course code)
+        panel_x = divider_x + 2
+        draw_text_compact(canvas, panel_x, 9, 'NEXT', title_color)
         if not calendar.get('enabled', True):
-            draw_text(canvas, 33, cal_y, 'OFF', muted_color)
-        elif not day_events:
-            draw_text(canvas, 33, cal_y, 'FREE', muted_color)
+            draw_text_compact(canvas, panel_x, 15, 'OFF', muted_color)
         else:
-            for event in day_events[:3]:
-                compact_time = event['time'].replace(':', '')[:4]
-                title = fit_text(event['title'], 3)
-                draw_text(canvas, 33, cal_y, f'{compact_time}{title}', text_color)
-                cal_y += 6
+            event = next_upcoming_event(calendar.get('events', []))
+            if not event:
+                draw_text_compact(canvas, panel_x, 15, 'FREE', muted_color)
+            else:
+                draw_text_compact(canvas, panel_x, 15, event['time'], text_color)
+                course_code = format_course_code(event['title'], 5) or 'CLASS'
+                draw_text_compact(canvas, panel_x, 21, course_code, text_color)
 
         canvas = matrix.SwapOnVSync(canvas)
         time.sleep(0.25)

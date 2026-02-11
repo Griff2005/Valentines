@@ -16,8 +16,8 @@ const defaultState = {
     widgets: {
       weather: {
         enabled: true,
-        city: 'Los Angeles',
-        unit: 'F',
+        city: 'Peterborough, Ontario',
+        unit: 'C',
         summary: 'Sunny',
         icon: 'sun',
         temp: '--'
@@ -40,16 +40,6 @@ const defaultState = {
         items: [
           { text: 'Buy flowers' },
           { text: 'Set table' }
-        ]
-      },
-      note: {
-        enabled: true,
-        catalog: [
-          'Love you forever',
-          'You make my day',
-          'I am proud of you',
-          'You are my favorite',
-          'Smile, beautiful'
         ]
       }
     },

@@ -45,12 +45,6 @@ const ids = {
   todoItems: document.getElementById('todo-items'),
   addTodo: document.getElementById('add-todo'),
 
-  noteEnabled: document.getElementById('note-enabled'),
-  noteSelect: document.getElementById('note-select'),
-  noteText: document.getElementById('note-text'),
-  addNote: document.getElementById('add-note'),
-  removeNote: document.getElementById('remove-note'),
-
   messageText: document.getElementById('message-text'),
   messageColor: document.getElementById('message-color'),
   messageEffect: document.getElementById('message-effect'),
@@ -83,8 +77,6 @@ let appState = null;
 let activeTab = 'widgets';
 let isDrawing = false;
 let eraserActive = false;
-let noteCatalogCache = [];
-let noteSelectionIndex = 0;
 let valentinePreviewPhase = 0;
 let previewTickerStarted = false;
 
@@ -172,20 +164,6 @@ function safeTime(value) {
   return /^\d{2}:\d{2}$/.test(text) ? text : '';
 }
 
-function getDailyNote(catalog, forDate = new Date()) {
-  const notes = (Array.isArray(catalog) ? catalog : [])
-    .map((note) => String(note || '').trim())
-    .filter(Boolean);
-
-  if (!notes.length) {
-    return '';
-  }
-
-  const ordinal = Math.floor(forDate.getTime() / 86400000);
-  const safeIndex = Math.abs(ordinal) % notes.length;
-  return notes[safeIndex];
-}
-
 function bulletPreviewSymbol(style) {
   if (style === 'heart') {
     return '♥';
@@ -233,6 +211,51 @@ function sortCalendarEvents(events) {
   });
 }
 
+function toCourseCode(value, maxLength = 8) {
+  const text = String(value || '').trim().toUpperCase();
+  if (!text) {
+    return '';
+  }
+
+  const structured = text.match(/[A-Z]{2,}\s*\d{2,}/);
+  if (structured) {
+    return structured[0].replace(/\s+/g, '').slice(0, maxLength);
+  }
+
+  return text.replace(/[^A-Z0-9]/g, '').slice(0, maxLength);
+}
+
+function nextUpcomingEvent(events, now = new Date()) {
+  let best = null;
+
+  for (const event of Array.isArray(events) ? events : []) {
+    const date = safeDate(event.date);
+    const time = safeTime(event.time) || '00:00';
+    if (!date) {
+      continue;
+    }
+
+    const when = new Date(`${date}T${time}:00`);
+    if (!Number.isFinite(when.getTime())) {
+      continue;
+    }
+
+    if (when.getTime() < now.getTime()) {
+      continue;
+    }
+
+    if (!best || when.getTime() < best.when.getTime()) {
+      best = {
+        when,
+        time,
+        title: String(event.title || '').trim()
+      };
+    }
+  }
+
+  return best;
+}
+
 function renderCalendarEvents(events) {
   ids.calendarEvents.innerHTML = '';
 
@@ -243,7 +266,6 @@ function renderCalendarEvents(events) {
     row.querySelector('[data-role="date"]').value = safeDate(event.date);
     row.querySelector('[data-role="time"]').value = safeTime(event.time);
     row.querySelector('[data-role="title"]').value = event.title || '';
-    row.querySelector('[data-role="location"]').value = event.location || '';
 
     row.querySelector('[data-role="remove"]').addEventListener('click', () => {
       row.remove();
@@ -284,48 +306,6 @@ function renderTodoItems(items) {
   }
 }
 
-function cleanNoteText(value) {
-  return String(value || '').trim().slice(0, 80);
-}
-
-function noteOptionLabel(value) {
-  const cleaned = cleanNoteText(value);
-  if (!cleaned) {
-    return 'Untitled note';
-  }
-  return cleaned.length > 40 ? `${cleaned.slice(0, 37)}...` : cleaned;
-}
-
-function renderNoteSelector(notes) {
-  noteCatalogCache = Array.isArray(notes) ? notes.map((note) => cleanNoteText(note)) : [];
-  noteCatalogCache = noteCatalogCache.filter((note) => note.length);
-  if (!noteCatalogCache.length) {
-    noteCatalogCache = ['Love you forever'];
-  }
-
-  if (noteSelectionIndex >= noteCatalogCache.length) {
-    noteSelectionIndex = 0;
-  }
-
-  ids.noteSelect.innerHTML = '';
-  noteCatalogCache.forEach((note, index) => {
-    const option = document.createElement('option');
-    option.value = String(index);
-    option.textContent = noteOptionLabel(note);
-    ids.noteSelect.appendChild(option);
-  });
-
-  ids.noteSelect.value = String(noteSelectionIndex);
-  ids.noteText.value = noteCatalogCache[noteSelectionIndex] || '';
-}
-
-function updateNoteOption(index, value) {
-  const option = ids.noteSelect.options[index];
-  if (option) {
-    option.textContent = noteOptionLabel(value);
-  }
-}
-
 function collectCalendarEvents() {
   const rows = Array.from(ids.calendarEvents.querySelectorAll('.calendar-item'));
   return rows
@@ -333,7 +313,6 @@ function collectCalendarEvents() {
       date: safeDate(row.querySelector('[data-role="date"]').value),
       time: safeTime(row.querySelector('[data-role="time"]').value) || '00:00',
       title: row.querySelector('[data-role="title"]').value.trim(),
-      location: row.querySelector('[data-role="location"]').value.trim(),
       source: row.dataset.source || 'manual'
     }))
     .filter((event) => event.date && event.title);
@@ -346,10 +325,6 @@ function collectTodoItems() {
       text: row.querySelector('[data-role="text"]').value.trim()
     }))
     .filter((item) => item.text);
-}
-
-function collectNotes() {
-  return noteCatalogCache.length ? noteCatalogCache.slice() : ['Love you forever'];
 }
 
 function populateFormFromState() {
@@ -369,7 +344,7 @@ function populateFormFromState() {
   const widgets = appState.board.widgets;
   ids.weatherEnabled.checked = Boolean(widgets.weather.enabled);
   ids.weatherCity.value = widgets.weather.city || '';
-  ids.weatherUnit.value = widgets.weather.unit || 'F';
+  ids.weatherUnit.value = widgets.weather.unit || 'C';
   const tempLabel = widgets.weather.temp ? `${widgets.weather.temp}${widgets.weather.unit || ''}` : '';
   const iconLabel = weatherIconSymbol(widgets.weather.icon);
   ids.weatherPreview.textContent = tempLabel ? `${tempLabel} ${iconLabel}`.trim() : '';
@@ -382,9 +357,6 @@ function populateFormFromState() {
   ids.todoEnabled.checked = Boolean(widgets.todo.enabled);
   ids.todoBulletStyle.value = widgets.todo.bulletStyle || 'dot';
   renderTodoItems(widgets.todo.items || []);
-
-  ids.noteEnabled.checked = Boolean(widgets.note.enabled);
-  renderNoteSelector(widgets.note.catalog || []);
 
   ids.messageText.value = appState.board.message.text || '';
   ids.messageColor.value = appState.board.message.color || '#ff3b30';
@@ -430,9 +402,6 @@ function syncStateFromForm() {
   appState.board.widgets.todo.enabled = ids.todoEnabled.checked;
   appState.board.widgets.todo.bulletStyle = ids.todoBulletStyle.value;
   appState.board.widgets.todo.items = collectTodoItems();
-
-  appState.board.widgets.note.enabled = ids.noteEnabled.checked;
-  appState.board.widgets.note.catalog = collectNotes();
 
   appState.board.message.text = ids.messageText.value;
   appState.board.message.color = ids.messageColor.value;
@@ -504,19 +473,7 @@ function drawPixelCanvas() {
 
 function drawWidgetPreview(width, height) {
   const widgets = appState.board.widgets;
-  const selectedDate = safeDate(widgets.calendar.selectedDate) || todayDateString();
-  const today = todayDateString();
   const now = new Date();
-  const dayEvents = sortCalendarEvents(widgets.calendar.events || []).filter((event) => event.date === selectedDate);
-  const upcomingEvents =
-    selectedDate === today
-      ? dayEvents.filter((event) => {
-          const safeEventTime = safeTime(event.time) || '00:00';
-          const eventDate = new Date(`${event.date}T${safeEventTime}:00`);
-          return eventDate.getTime() >= now.getTime();
-        })
-      : dayEvents;
-  const dailyNote = widgets.note.enabled ? getDailyNote(widgets.note.catalog || []) : 'OFF';
   const weatherTemp = widgets.weather.temp ? `${widgets.weather.temp}${widgets.weather.unit || ''}`.trim() : '--';
   const isNight = now.getHours() < 6 || now.getHours() >= 18;
   const iconName =
@@ -525,6 +482,8 @@ function drawWidgetPreview(width, height) {
       : widgets.weather.icon;
   const weatherIcon = weatherIconSymbol(iconName);
   const weatherText = widgets.weather.enabled ? `${weatherTemp} ${weatherIcon}`.trim() : 'OFF';
+  const nextEvent = widgets.calendar.enabled ? nextUpcomingEvent(widgets.calendar.events || [], now) : null;
+  const dividerX = Math.round(width * 0.74);
 
   previewCtx.strokeStyle = 'rgba(255,255,255,0.18)';
   previewCtx.lineWidth = 2;
@@ -532,8 +491,8 @@ function drawWidgetPreview(width, height) {
   previewCtx.beginPath();
   previewCtx.moveTo(0, height * 0.25);
   previewCtx.lineTo(width, height * 0.25);
-  previewCtx.moveTo(width * 0.5, height * 0.25);
-  previewCtx.lineTo(width * 0.5, height);
+  previewCtx.moveTo(dividerX, height * 0.25);
+  previewCtx.lineTo(dividerX, height);
   previewCtx.stroke();
 
   previewCtx.fillStyle = '#ffe082';
@@ -541,36 +500,40 @@ function drawWidgetPreview(width, height) {
   previewCtx.textAlign = 'left';
   previewCtx.fillText(nowClockString(), 14, 44);
   previewCtx.fillStyle = '#8ed7ff';
-  previewCtx.fillText(weatherText.slice(0, 12), 150, 44);
-
-  previewCtx.fillStyle = '#ffd2a1';
-  previewCtx.font = '700 18px Space Grotesk';
-  previewCtx.fillText('NOTE', width * 0.63, 28);
-  previewCtx.fillStyle = '#fff9c4';
-  previewCtx.fillText((dailyNote || '').slice(0, 18), width * 0.63, 54);
+  previewCtx.textAlign = 'right';
+  previewCtx.fillText(weatherText.slice(0, 10), width - 14, 44);
 
   previewCtx.fillStyle = '#ffe082';
   previewCtx.font = '700 20px Space Grotesk';
+  previewCtx.textAlign = 'left';
   previewCtx.fillText('TODO', 14, height * 0.34);
   previewCtx.fillStyle = '#f4f4f4';
   previewCtx.font = '500 18px Space Grotesk';
 
   const bulletSymbol = bulletPreviewSymbol(widgets.todo.bulletStyle || 'dot');
-  const todoLines = (widgets.todo.items || []).slice(0, 3);
+  const todoLines = (widgets.todo.items || []).slice(0, 4);
   todoLines.forEach((item, index) => {
-    previewCtx.fillText(`${bulletSymbol} ${item.text}`.slice(0, 20), 14, height * 0.42 + index * 28);
+    previewCtx.fillText(`${bulletSymbol} ${item.text}`.slice(0, 28), 14, height * 0.42 + index * 24);
   });
 
   previewCtx.fillStyle = '#ffe082';
-  previewCtx.font = '700 20px Space Grotesk';
-  previewCtx.fillText('TODAY', width * 0.53, height * 0.34);
+  previewCtx.font = '700 18px Space Grotesk';
+  previewCtx.fillText('NEXT', dividerX + 12, height * 0.34);
   previewCtx.fillStyle = '#f4f4f4';
-  previewCtx.font = '500 16px Space Grotesk';
+  previewCtx.font = '700 20px Space Grotesk';
+  if (!widgets.calendar.enabled) {
+    previewCtx.fillText('OFF', dividerX + 12, height * 0.5);
+    return;
+  }
 
-  upcomingEvents.slice(0, 4).forEach((event, index) => {
-    const line = `${event.time || '--:--'} ${event.title || ''}`.trim();
-    previewCtx.fillText(line.slice(0, 24), width * 0.53, height * 0.42 + index * 24);
-  });
+  if (!nextEvent) {
+    previewCtx.fillText('FREE', dividerX + 12, height * 0.5);
+    return;
+  }
+
+  const courseCode = toCourseCode(nextEvent.title, 8) || 'CLASS';
+  previewCtx.fillText(nextEvent.time, dividerX + 12, height * 0.48);
+  previewCtx.fillText(courseCode, dividerX + 12, height * 0.62);
 }
 
 function drawPreviewLedCell(x, y, sx, sy, color) {
@@ -780,7 +743,6 @@ async function importCalendarDayFromIcs() {
     date: event.date,
     time: event.time || '00:00',
     title: event.title,
-    location: event.location || '',
     source: 'ics'
   }));
 
@@ -957,7 +919,6 @@ function registerEvents() {
         date,
         time: '09:00',
         title: '',
-        location: '',
         source: 'manual'
       }
     ]);
@@ -972,54 +933,6 @@ function registerEvents() {
         text: ''
       }
     ]);
-    syncStateFromForm();
-    drawPreview();
-  });
-
-  ids.noteSelect.addEventListener('change', () => {
-    noteSelectionIndex = Number(ids.noteSelect.value) || 0;
-    ids.noteText.value = noteCatalogCache[noteSelectionIndex] || '';
-    syncStateFromForm();
-    drawPreview();
-  });
-
-  ids.noteText.addEventListener('input', () => {
-    if (!noteCatalogCache.length) {
-      noteCatalogCache = [''];
-      noteSelectionIndex = 0;
-    }
-    const nextValue = ids.noteText.value.slice(0, 80);
-    if (nextValue !== ids.noteText.value) {
-      ids.noteText.value = nextValue;
-    }
-    noteCatalogCache[noteSelectionIndex] = nextValue;
-    updateNoteOption(noteSelectionIndex, nextValue);
-    syncStateFromForm();
-    drawPreview();
-  });
-
-  ids.addNote.addEventListener('click', () => {
-    noteCatalogCache.push('New note');
-    noteSelectionIndex = noteCatalogCache.length - 1;
-    renderNoteSelector(noteCatalogCache);
-    syncStateFromForm();
-    drawPreview();
-  });
-
-  ids.removeNote.addEventListener('click', () => {
-    if (!noteCatalogCache.length) {
-      noteCatalogCache = ['Love you forever'];
-      noteSelectionIndex = 0;
-    } else {
-      noteCatalogCache.splice(noteSelectionIndex, 1);
-      if (!noteCatalogCache.length) {
-        noteCatalogCache = ['Love you forever'];
-        noteSelectionIndex = 0;
-      } else if (noteSelectionIndex >= noteCatalogCache.length) {
-        noteSelectionIndex = noteCatalogCache.length - 1;
-      }
-    }
-    renderNoteSelector(noteCatalogCache);
     syncStateFromForm();
     drawPreview();
   });
@@ -1045,7 +958,6 @@ function registerEvents() {
     ids.calendarDay,
     ids.todoEnabled,
     ids.todoBulletStyle,
-    ids.noteEnabled,
     ids.messageText,
     ids.messageColor,
     ids.messageEffect,

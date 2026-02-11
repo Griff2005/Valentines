@@ -30,7 +30,6 @@ function normalizeCalendarEvents(events) {
       date: String(event?.date || '').trim(),
       time: String(event?.time || '').trim(),
       title: String(event?.title || '').trim(),
-      location: String(event?.location || '').trim(),
       source: String(event?.source || 'manual').trim()
     }))
   )
@@ -39,20 +38,6 @@ function normalizeCalendarEvents(events) {
       ...event,
       time: /^\d{2}:\d{2}$/.test(event.time) ? event.time : '00:00'
     }));
-}
-
-function normalizeNoteCatalog(catalog, fallbackText = '') {
-  const merged = [
-    ...(Array.isArray(catalog) ? catalog : []),
-    ...(fallbackText ? [fallbackText] : [])
-  ];
-
-  const normalized = merged
-    .map((note) => String(note || '').trim().slice(0, 80))
-    .filter(Boolean);
-
-  const deduped = Array.from(new Set(normalized));
-  return deduped.length ? deduped : ['Love you forever'];
 }
 
 function normalizeBulletStyle(style) {
@@ -87,7 +72,6 @@ async function buildWidgetPayload(state, getWeather) {
   const weatherWidget = widgets.weather || {};
   const calendarWidget = widgets.calendar || {};
   const todoWidget = widgets.todo || {};
-  const noteWidget = widgets.note || {};
 
   let weatherData = {
     city: weatherWidget.city,
@@ -113,7 +97,6 @@ async function buildWidgetPayload(state, getWeather) {
 
   const events = normalizeCalendarEvents(calendarWidget.events);
   const todoItems = normalizeTodoItems(todoWidget.items || []);
-  const noteCatalog = normalizeNoteCatalog(noteWidget.catalog, noteWidget.text);
 
   return {
     mode: 'widgets',
@@ -137,10 +120,6 @@ async function buildWidgetPayload(state, getWeather) {
         enabled: Boolean(todoWidget.enabled),
         bulletStyle: normalizeBulletStyle(todoWidget.bulletStyle),
         items: todoItems
-      },
-      note: {
-        enabled: Boolean(noteWidget.enabled),
-        catalog: noteCatalog
       }
     }
   };

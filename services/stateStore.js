@@ -72,7 +72,6 @@ function sanitizeCalendarEvents(events) {
       date: sanitizeDate(event?.date, ''),
       time: sanitizeTime(event?.time),
       title: String(event?.title || '').trim().slice(0, 80),
-      location: String(event?.location || '').trim().slice(0, 80),
       source: String(event?.source || 'manual').trim().slice(0, 24) || 'manual'
     }))
     .filter((event) => event.date && event.title);
@@ -88,20 +87,6 @@ function sanitizeTodoItems(items) {
       text: String(item?.text || '').trim().slice(0, 80)
     }))
     .filter((item) => item.text);
-}
-
-function sanitizeNoteCatalog(noteWidget) {
-  const directCatalog = Array.isArray(noteWidget.catalog) ? noteWidget.catalog : [];
-  const migratedText = typeof noteWidget.text === 'string' ? [noteWidget.text] : [];
-
-  const merged = [...directCatalog, ...migratedText];
-
-  const normalized = merged
-    .map((value) => String(value || '').trim().slice(0, 80))
-    .filter(Boolean);
-
-  const deduped = Array.from(new Set(normalized));
-  return deduped.length ? deduped : ['Love you forever'];
 }
 
 function clampInteger(value, min, max, fallback) {
@@ -185,10 +170,7 @@ function normalizeState(inputState) {
   const bulletStyle = String(todo.bulletStyle || '').trim().toLowerCase();
   todo.bulletStyle = allowedBullets.has(bulletStyle) ? bulletStyle : 'dot';
   todo.items = sanitizeTodoItems(todo.items);
-
-  const note = merged.board.widgets.note;
-  note.catalog = sanitizeNoteCatalog(note);
-  delete note.text;
+  delete merged.board.widgets.note;
 
   const valentine = merged.board.valentine || {};
   merged.board.valentine = {

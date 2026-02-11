@@ -110,7 +110,7 @@
 
             <section id="tab-widgets" class="tab-panel is-active">
               <h3>Widget Dashboard</h3>
-              <p class="card-help">Top row: time + weather + daily note. Bottom: todo list on the left, day schedule on the right.</p>
+              <p class="card-help">Top row: time + date + weather. Bottom: to-do list on the left, next event on the right.</p>
 
               <div class="widget-grid">
                 <article class="mini-card">
@@ -120,13 +120,13 @@
                   </div>
                   <label>
                     <span>City</span>
-                    <input id="weather-city" type="text" placeholder="Peterborough" />
+                    <input id="weather-city" type="text" placeholder="Peterborough, Ontario" />
                   </label>
                   <label>
                     <span>Unit</span>
                     <select id="weather-unit">
-                      <option value="F">Fahrenheit</option>
                       <option value="C">Celsius</option>
+                      <option value="F">Fahrenheit</option>
                     </select>
                   </label>
                   <button id="refresh-weather" class="btn btn-ghost">Preview Weather</button>
@@ -138,6 +138,7 @@
                     <h4>Calendar</h4>
                     <label class="checkbox inline"><input id="calendar-enabled" type="checkbox" /> Enabled</label>
                   </div>
+                  <p class="hint">Board shows only the next upcoming event (time + course code).</p>
                   <label>
                     <span>Calendar Day</span>
                     <input id="calendar-day" type="date" />
@@ -171,26 +172,6 @@
                   </label>
                   <div id="todo-items" class="list-stack"></div>
                   <button id="add-todo" class="btn btn-ghost">Add Task</button>
-                </article>
-
-                <article class="mini-card">
-                  <div class="mini-head">
-                    <h4>Note Catalog</h4>
-                    <label class="checkbox inline"><input id="note-enabled" type="checkbox" /> Enabled</label>
-                  </div>
-                  <p class="hint">One short note is shown per day, rotating through this list automatically.</p>
-                  <label>
-                    <span>Choose Note</span>
-                    <select id="note-select"></select>
-                  </label>
-                  <label>
-                    <span>Edit Note</span>
-                    <textarea id="note-text" rows="2" placeholder="Short note for this day" maxlength="80"></textarea>
-                  </label>
-                  <div class="button-row">
-                    <button id="add-note" class="btn btn-ghost">Add Note</button>
-                    <button id="remove-note" class="btn btn-danger">Remove Selected</button>
-                  </div>
                 </article>
               </div>
             </section>
@@ -288,8 +269,7 @@
           <input type="time" data-role="time" />
           <button data-role="remove" class="btn btn-danger">Remove</button>
         </div>
-        <input type="text" data-role="title" placeholder="Event title" maxlength="60" />
-        <input type="text" data-role="location" placeholder="Location (optional)" maxlength="60" />
+        <input type="text" data-role="title" placeholder="Course code (e.g. COSC220)" maxlength="20" />
       </div>
     </template>
 

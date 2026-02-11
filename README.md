@@ -10,9 +10,8 @@ A simple, intuitive website for remotely controlling a **64x32 LED matrix** conn
 
 - Widget dashboard mode:
   - Weather widget (city + unit selection + icon)
-  - Calendar day widget (manual events + ICS day import from `schedule.2026WI.ics`)
+  - Calendar widget (board shows one next upcoming event: time + course code)
   - To-do widget (easy task add/remove + bullet style selection)
-  - Rotating daily note widget (from a note catalog)
 - Full-board message mode:
   - Custom text
   - Color + speed + effect (scroll/pulse/static)
