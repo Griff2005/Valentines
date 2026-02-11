@@ -85,8 +85,9 @@ const defaultState = {
       cols: 64,
       chainLength: 1,
       parallel: 1,
-      hardwareMapping: 'adafruit-hat-pwm',
-      gpioSlowdown: 2,
+      hardwareMapping: 'regular',
+      gpioSlowdown: 4,
+      noHardwarePulse: true,
       pwmBits: 11,
       pwmLsbNanoseconds: 130
     }

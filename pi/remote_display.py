@@ -204,8 +204,9 @@ def build_matrix(payload):
     options.cols = int(clamp(options_data.get('cols'), 32, 128, 64))
     options.chain_length = int(clamp(options_data.get('chainLength'), 1, 4, 1))
     options.parallel = int(clamp(options_data.get('parallel'), 1, 3, 1))
-    options.hardware_mapping = str(options_data.get('hardwareMapping') or 'adafruit-hat-pwm')
-    options.gpio_slowdown = int(clamp(options_data.get('gpioSlowdown'), 0, 5, 2))
+    options.hardware_mapping = str(options_data.get('hardwareMapping') or 'regular')
+    options.gpio_slowdown = int(clamp(options_data.get('gpioSlowdown'), 0, 8, 4))
+    options.disable_hardware_pulsing = bool(options_data.get('noHardwarePulse', True))
     options.pwm_bits = int(clamp(options_data.get('pwmBits'), 1, 11, 11))
     options.pwm_lsb_nanoseconds = int(clamp(options_data.get('pwmLsbNanoseconds'), 50, 300, 130))
 

@@ -122,6 +122,14 @@ bash ~/path/to/Valentines/pi/install_pi_side.sh
 
 or manually follow setup in the `rpi-rgb-led-matrix` repository.
 
+### Direct HUB75 Wiring Profile (Your Diagram)
+
+This project is configured for direct GPIO wiring to one 64x32 panel using the `regular` mapping:
+
+- `hardwareMapping=regular`
+- `gpioSlowdown=4` (Pi 4 stable default)
+- `noHardwarePulse=true` (same as `--led-no-hardware-pulse`)
+
 ### 2) In the web app, fill Pi settings
 
 - Host: `lrdigiboard`

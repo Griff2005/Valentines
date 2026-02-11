@@ -62,13 +62,21 @@ function normalizeBulletStyle(style) {
 
 function buildMatrixOptions(state) {
   const matrix = state.pi.matrixOptions || {};
+  const rawMapping = typeof matrix.hardwareMapping === 'string' ? matrix.hardwareMapping.trim() : '';
+  const hardwareMapping = rawMapping || 'regular';
+  let gpioSlowdown = clampNumber(matrix.gpioSlowdown, 0, 8, 4);
+  if (hardwareMapping === 'regular' && gpioSlowdown < 4) {
+    gpioSlowdown = 4;
+  }
+
   return {
     rows: clampNumber(matrix.rows, 16, 64, 32),
     cols: clampNumber(matrix.cols, 32, 128, 64),
     chainLength: clampNumber(matrix.chainLength, 1, 4, 1),
     parallel: clampNumber(matrix.parallel, 1, 3, 1),
-    hardwareMapping: typeof matrix.hardwareMapping === 'string' ? matrix.hardwareMapping : 'adafruit-hat-pwm',
-    gpioSlowdown: clampNumber(matrix.gpioSlowdown, 0, 5, 2),
+    hardwareMapping,
+    gpioSlowdown,
+    noHardwarePulse: matrix.noHardwarePulse !== false,
     pwmBits: clampNumber(matrix.pwmBits, 1, 11, 11),
     pwmLsbNanoseconds: clampNumber(matrix.pwmLsbNanoseconds, 50, 300, 130)
   };

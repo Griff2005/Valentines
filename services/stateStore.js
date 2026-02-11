@@ -104,6 +104,60 @@ function sanitizeNoteCatalog(noteWidget) {
   return deduped.length ? deduped : ['Love you forever'];
 }
 
+function clampInteger(value, min, max, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return fallback;
+  }
+
+  return Math.min(max, Math.max(min, Math.round(number)));
+}
+
+function sanitizeHardwareMapping(value) {
+  const allowed = new Set([
+    'regular',
+    'regular-pi1',
+    'adafruit-hat',
+    'adafruit-hat-pwm',
+    'classic',
+    'classic-pi1',
+    'compute-module'
+  ]);
+
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) {
+    return 'regular';
+  }
+
+  // Project default is direct HUB75 wiring (regular mapping).
+  if (normalized === 'adafruit-hat-pwm') {
+    return 'regular';
+  }
+
+  return allowed.has(normalized) ? normalized : 'regular';
+}
+
+function sanitizeMatrixOptions(matrixOptions) {
+  const matrix = isObject(matrixOptions) ? matrixOptions : {};
+  const hardwareMapping = sanitizeHardwareMapping(matrix.hardwareMapping);
+  let gpioSlowdown = clampInteger(matrix.gpioSlowdown, 0, 8, 4);
+  if (hardwareMapping === 'regular' && gpioSlowdown < 4) {
+    gpioSlowdown = 4;
+  }
+
+  return {
+    rows: clampInteger(matrix.rows, 16, 64, 32),
+    cols: clampInteger(matrix.cols, 32, 128, 64),
+    chainLength: clampInteger(matrix.chainLength, 1, 4, 1),
+    parallel: clampInteger(matrix.parallel, 1, 3, 1),
+    hardwareMapping,
+    gpioSlowdown,
+    noHardwarePulse: matrix.noHardwarePulse !== false,
+    pwmBits: clampInteger(matrix.pwmBits, 1, 11, 11),
+    pwmLsbNanoseconds: clampInteger(matrix.pwmLsbNanoseconds, 50, 300, 130)
+  };
+}
+
 function normalizeState(inputState) {
   const merged = deepMerge(defaultState, inputState || {});
   merged.board.width = 64;
@@ -141,6 +195,8 @@ function normalizeState(inputState) {
     question: String(valentine.question || '').trim().slice(0, 80) || 'Will you be my Valentine?',
     fireworks: Boolean(valentine.fireworks)
   };
+
+  merged.pi.matrixOptions = sanitizeMatrixOptions(merged.pi.matrixOptions);
 
   return merged;
 }
