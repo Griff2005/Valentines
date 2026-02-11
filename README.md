@@ -10,7 +10,8 @@ A simple, intuitive website for remotely controlling a **64x32 LED matrix** conn
 
 - Widget dashboard mode:
   - Weather widget (city + unit selection + icon)
-  - Calendar widget (board shows one next upcoming event: time + course code)
+  - Calendar widget (board shows one next upcoming event: time + program + course number)
+  - Calendar editor auto-loads upcoming events from `schedule.csv`
   - To-do widget (easy task add/remove + bullet style selection)
 - Full-board message mode:
   - Custom text
@@ -167,6 +168,7 @@ sudo systemctl restart love-board
 ## Notes
 
 - Settings are persisted in `data/state.json`.
+- Upcoming calendar events are read from `schedule.csv` and auto-seeded into saved state.
 - If you store a password in the UI, it is saved in `data/state.json` for convenience.
 - Renderer logs on Pi: `/tmp/lrdigiboard.log`
 
@@ -186,6 +188,7 @@ sudo systemctl restart love-board
 - `PUT /api/state`
 - `POST /api/weather`
 - `GET /api/calendar/day?date=YYYY-MM-DD`
+- `GET /api/calendar/events?from=YYYY-MM-DD`
 - `POST /api/pi/test`
 - `POST /api/pi/install`
 - `POST /api/board/push`

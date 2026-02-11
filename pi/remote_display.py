@@ -349,7 +349,7 @@ def format_event_time(value):
     return '00:00'
 
 
-def split_course_parts(value, program_max_chars=5, number_max_chars=4):
+def split_course_parts(value, program_max_chars=4, number_max_chars=4):
     text = str(value or '').strip().upper()
     if not text:
         return ('', '')
@@ -473,9 +473,9 @@ def run_widgets(matrix, payload):
                 draw_text_compact(canvas, panel_x, 18, 'FREE', muted_color)
             else:
                 draw_text_compact(canvas, panel_x, 12, event['time'], text_color)
-                program, number = split_course_parts(event['title'], 5, 4)
-                draw_text_compact(canvas, panel_x, 18, program or 'CLASS', text_color)
-                draw_text_compact(canvas, panel_x, 24, number or '----', text_color)
+                program, number = split_course_parts(event['title'], 4, 4)
+                draw_text(canvas, panel_x, 18, program or 'CLAS', text_color)
+                draw_text(canvas, panel_x, 24, number or '----', text_color)
 
         canvas = matrix.SwapOnVSync(canvas)
         time.sleep(0.25)

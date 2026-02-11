@@ -20,137 +20,131 @@ function normalizeDateInput(value) {
   return getTodayDateString();
 }
 
-function decodeIcsText(value) {
-  return String(value || '')
-    .replace(/\\n/gi, ' ')
-    .replace(/\\,/g, ',')
-    .replace(/\\;/g, ';')
-    .replace(/\\\\/g, '\\')
-    .trim();
-}
-
-function unfoldLines(rawText) {
-  const lines = String(rawText || '').replace(/\r\n/g, '\n').split('\n');
-  const unfolded = [];
-
-  for (const line of lines) {
-    if ((line.startsWith(' ') || line.startsWith('\t')) && unfolded.length) {
-      unfolded[unfolded.length - 1] += line.slice(1);
-    } else {
-      unfolded.push(line);
-    }
-  }
-
-  return unfolded;
-}
-
-function formatDateParts(year, month, day) {
-  return `${year}-${month}-${day}`;
-}
-
-function parseIcsDateTime(rawValue) {
-  const value = String(rawValue || '').trim();
-
-  if (/^\d{8}$/.test(value)) {
-    return {
-      date: formatDateParts(value.slice(0, 4), value.slice(4, 6), value.slice(6, 8)),
-      time: '00:00',
-      allDay: true
-    };
-  }
-
-  const match = value.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z?)$/);
-  if (!match) {
-    return null;
-  }
-
-  const [, year, month, day, hour, minute, second, isUtc] = match;
-
-  if (isUtc === 'Z') {
-    const utcDate = new Date(Date.UTC(
-      Number(year),
-      Number(month) - 1,
-      Number(day),
-      Number(hour),
-      Number(minute),
-      Number(second)
-    ));
-
-    return {
-      date: `${utcDate.getFullYear()}-${pad2(utcDate.getMonth() + 1)}-${pad2(utcDate.getDate())}`,
-      time: `${pad2(utcDate.getHours())}:${pad2(utcDate.getMinutes())}`,
-      allDay: false
-    };
-  }
-
-  return {
-    date: formatDateParts(year, month, day),
-    time: `${hour}:${minute}`,
-    allDay: false
-  };
-}
-
 function eventSortValue(event) {
   const time = event.time || '00:00';
   return `${event.date}T${time}:00`;
 }
 
-function parseIcsEvents(icsText) {
-  const lines = unfoldLines(icsText);
+function parseCsvLine(line) {
+  const values = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const next = line[index + 1];
+
+    if (char === '"' && inQuotes && next === '"') {
+      current += '"';
+      index += 1;
+      continue;
+    }
+
+    if (char === '"') {
+      inQuotes = !inQuotes;
+      continue;
+    }
+
+    if (char === ',' && !inQuotes) {
+      values.push(current.trim());
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  values.push(current.trim());
+  return values;
+}
+
+function parseCsvDate(rawValue) {
+  const text = String(rawValue || '').trim();
+  if (!text) {
+    return '';
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return text;
+  }
+
+  const slashParts = text.split('/');
+  if (slashParts.length === 3) {
+    const [partA, partB, partC] = slashParts.map((part) => part.trim());
+
+    if (/^\d{2}$/.test(partA) && /^\d{2}$/.test(partB) && /^\d{2}$/.test(partC)) {
+      return `20${partA}-${partB}-${partC}`;
+    }
+
+    if (/^\d{4}$/.test(partA) && /^\d{2}$/.test(partB) && /^\d{2}$/.test(partC)) {
+      return `${partA}-${partB}-${partC}`;
+    }
+  }
+
+  return '';
+}
+
+function parseCsvTime(rawValue) {
+  const text = String(rawValue || '').trim();
+  if (!text) {
+    return '';
+  }
+
+  const match = text.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) {
+    return '';
+  }
+
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    return '';
+  }
+
+  return `${pad2(hour)}:${pad2(minute)}`;
+}
+
+function parseCsvEvents(csvText) {
+  const lines = String(csvText || '')
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (!lines.length) {
+    return [];
+  }
+
+  const header = parseCsvLine(lines[0]).map((value) => value.toLowerCase());
+  const dateIndex = header.indexOf('date');
+  const timeIndex = header.indexOf('time');
+  const programIndex = header.indexOf('program');
+  const numberIndex = header.indexOf('number');
+  const titleIndex = header.indexOf('title');
+
   const events = [];
-  let current = null;
 
-  for (const line of lines) {
-    if (line === 'BEGIN:VEVENT') {
-      current = {};
+  for (const line of lines.slice(1)) {
+    const columns = parseCsvLine(line);
+    const date = parseCsvDate(columns[dateIndex]);
+    const time = parseCsvTime(columns[timeIndex]) || '00:00';
+    const program = String(columns[programIndex] || '').trim().toUpperCase();
+    const number = String(columns[numberIndex] || '').trim().toUpperCase();
+    const inlineTitle = String(columns[titleIndex] || '').trim();
+    const title = (program || number)
+      ? `${program}${number}`.trim()
+      : inlineTitle;
+
+    if (!date || !title) {
       continue;
     }
 
-    if (line === 'END:VEVENT') {
-      if (!current) {
-        continue;
-      }
-
-      const start = current.DTSTART ? parseIcsDateTime(current.DTSTART.value) : null;
-      const end = current.DTEND ? parseIcsDateTime(current.DTEND.value) : null;
-
-      if (start && start.date) {
-        events.push({
-          uid: decodeIcsText(current.UID?.value || ''),
-          date: start.date,
-          time: start.time,
-          endDate: end?.date || '',
-          endTime: end?.time || '',
-          allDay: Boolean(start.allDay),
-          title: decodeIcsText(current.SUMMARY?.value || 'Untitled'),
-          location: decodeIcsText(current.LOCATION?.value || ''),
-          source: 'ics'
-        });
-      }
-
-      current = null;
-      continue;
-    }
-
-    if (!current) {
-      continue;
-    }
-
-    const separator = line.indexOf(':');
-    if (separator < 0) {
-      continue;
-    }
-
-    const rawKey = line.slice(0, separator);
-    const value = line.slice(separator + 1);
-    const key = rawKey.split(';')[0].toUpperCase();
-
-    if (!current[key]) {
-      current[key] = {
-        rawKey,
-        value
-      };
-    }
+    events.push({
+      date,
+      time,
+      title,
+      source: 'csv'
+    });
   }
 
   return events.sort((a, b) => {
@@ -160,15 +154,15 @@ function parseIcsEvents(icsText) {
   });
 }
 
-async function loadIcsEvents(filePath) {
+async function loadCsvEvents(filePath) {
   const resolvedPath = path.resolve(filePath);
   const raw = await fs.readFile(resolvedPath, 'utf8');
-  return parseIcsEvents(raw);
+  return parseCsvEvents(raw);
 }
 
-async function loadIcsEventsForDate(filePath, dateInput) {
+async function loadCsvEventsForDate(filePath, dateInput) {
   const date = normalizeDateInput(dateInput);
-  const events = await loadIcsEvents(filePath);
+  const events = await loadCsvEvents(filePath);
   return {
     date,
     events: events.filter((event) => event.date === date),
@@ -176,8 +170,19 @@ async function loadIcsEventsForDate(filePath, dateInput) {
   };
 }
 
+async function loadCsvEventsFromDate(filePath, dateInput) {
+  const date = normalizeDateInput(dateInput);
+  const events = await loadCsvEvents(filePath);
+  return {
+    date,
+    events: events.filter((event) => event.date >= date),
+    totalEventsInFile: events.length
+  };
+}
+
 module.exports = {
-  loadIcsEvents,
-  loadIcsEventsForDate,
+  loadCsvEvents,
+  loadCsvEventsForDate,
+  loadCsvEventsFromDate,
   normalizeDateInput
 };

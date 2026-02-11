@@ -37,7 +37,6 @@ const ids = {
   calendarJumpWeek: document.getElementById('calendar-jump-week'),
   calendarEvents: document.getElementById('calendar-events'),
   addEvent: document.getElementById('add-event'),
-  importIcs: document.getElementById('import-ics'),
   calendarImportStatus: document.getElementById('calendar-import-status'),
 
   todoEnabled: document.getElementById('todo-enabled'),
@@ -212,7 +211,7 @@ function sortCalendarEvents(events) {
   });
 }
 
-function splitCourseParts(value, programMaxLength = 5, numberMaxLength = 4) {
+function splitCourseParts(value, programMaxLength = 4, numberMaxLength = 4) {
   const text = String(value || '').trim().toUpperCase();
   if (!text) {
     return { program: '', number: '' };
@@ -263,6 +262,64 @@ function nextUpcomingEvent(events, now = new Date()) {
   }
 
   return best;
+}
+
+function normalizeCalendarEventForMerge(event, fallbackSource = 'manual') {
+  const date = safeDate(event?.date);
+  const time = safeTime(event?.time) || '00:00';
+  const title = String(event?.title || '').trim();
+  if (!date || !title) {
+    return null;
+  }
+
+  return {
+    date,
+    time,
+    title,
+    source: String(event?.source || fallbackSource).trim() || fallbackSource
+  };
+}
+
+function calendarSlotKey(event) {
+  return `${event.date}|${event.time || '00:00'}`;
+}
+
+function mergeCalendarEvents(existingEvents, incomingEvents) {
+  const merged = [];
+  const seenSlots = new Set();
+  let added = 0;
+
+  for (const rawEvent of Array.isArray(existingEvents) ? existingEvents : []) {
+    const event = normalizeCalendarEventForMerge(rawEvent, 'manual');
+    if (!event) {
+      continue;
+    }
+    const key = calendarSlotKey(event);
+    if (seenSlots.has(key)) {
+      continue;
+    }
+    seenSlots.add(key);
+    merged.push(event);
+  }
+
+  for (const rawEvent of Array.isArray(incomingEvents) ? incomingEvents : []) {
+    const event = normalizeCalendarEventForMerge(rawEvent, 'csv');
+    if (!event) {
+      continue;
+    }
+    const key = calendarSlotKey(event);
+    if (seenSlots.has(key)) {
+      continue;
+    }
+    seenSlots.add(key);
+    merged.push(event);
+    added += 1;
+  }
+
+  return {
+    events: sortCalendarEvents(merged),
+    added
+  };
 }
 
 function renderCalendarEvents(events) {
@@ -360,7 +417,6 @@ function populateFormFromState() {
 
   ids.calendarEnabled.checked = Boolean(widgets.calendar.enabled);
   ids.calendarDay.value = safeDate(widgets.calendar.selectedDate) || todayDateString();
-  ids.calendarImportStatus.textContent = '';
   renderCalendarEvents(widgets.calendar.events || []);
 
   ids.todoEnabled.checked = Boolean(widgets.todo.enabled);
@@ -536,7 +592,7 @@ function drawWidgetPreview(width, height) {
     return;
   }
 
-  const parts = splitCourseParts(nextEvent.title, 5, 4);
+  const parts = splitCourseParts(nextEvent.title, 4, 4);
   previewCtx.fillText(nextEvent.time, dividerX + 12, height * 0.4);
   previewCtx.fillText(parts.program || 'CLASS', dividerX + 12, height * 0.55);
   previewCtx.fillText(parts.number || '----', dividerX + 12, height * 0.7);
@@ -728,29 +784,37 @@ async function pushMode(mode) {
   return result;
 }
 
-async function importCalendarDayFromIcs() {
-  syncStateFromForm();
-  const date = safeDate(ids.calendarDay.value) || todayDateString();
+async function autoSyncCalendarFromCsv() {
+  const from = todayDateString();
+  const existing = Array.isArray(appState?.board?.widgets?.calendar?.events)
+    ? appState.board.widgets.calendar.events
+    : [];
+  const hasSeededFutureCsv = existing.some((event) => (
+    safeDate(event?.date) >= from && String(event?.source || '').toLowerCase() === 'csv'
+  ));
 
-  setStatus('working', `Importing ${date} from schedule.2026WI.ics...`);
+  if (hasSeededFutureCsv) {
+    return 0;
+  }
 
-  const payload = await api(`/api/calendar/day?date=${encodeURIComponent(date)}`, {
+  const payload = await api(`/api/calendar/events?from=${encodeURIComponent(from)}`, {
     method: 'GET'
   });
 
-  const existing = collectCalendarEvents().filter((event) => event.date !== date);
-  const imported = payload.events.map((event) => ({
-    date: event.date,
-    time: event.time || '00:00',
-    title: event.title,
-    source: 'ics'
-  }));
+  const incoming = Array.isArray(payload.events) ? payload.events : [];
+  const merged = mergeCalendarEvents(existing, incoming);
 
-  appState.board.widgets.calendar.events = [...existing, ...imported];
-  renderCalendarEvents(appState.board.widgets.calendar.events);
-  ids.calendarImportStatus.textContent = `Imported ${imported.length} event${imported.length === 1 ? '' : 's'} for ${date}.`;
-  setStatus('success', `Calendar imported for ${date}.`);
-  drawPreview();
+  appState.board.widgets.calendar.events = merged.events;
+
+  if (merged.added > 0) {
+    const saved = await api('/api/state', {
+      method: 'PUT',
+      body: JSON.stringify(appState)
+    });
+    appState = saved;
+  }
+
+  return merged.added;
 }
 
 function setCalendarDay(value) {
@@ -788,7 +852,20 @@ function startPreviewTicker() {
 async function init() {
   setStatus('working', 'Loading saved settings...');
   appState = await api('/api/state');
+  let autoLoadedCount = 0;
+
+  try {
+    autoLoadedCount = await autoSyncCalendarFromCsv();
+  } catch (error) {
+    ids.calendarImportStatus.textContent = `Calendar auto-sync failed: ${error.message}`;
+  }
+
   populateFormFromState();
+  if (!ids.calendarImportStatus.textContent) {
+    ids.calendarImportStatus.textContent = autoLoadedCount > 0
+      ? `Auto-loaded ${autoLoadedCount} upcoming event${autoLoadedCount === 1 ? '' : 's'} from schedule.csv.`
+      : 'Calendar is up to date from schedule.csv.';
+  }
   drawPreview();
   startPreviewTicker();
   setStatus('success', 'Ready. Update controls then click Show Current Tab on Board.');
@@ -899,15 +976,6 @@ function registerEvents() {
       await pushMode('valentine');
     } catch (error) {
       setStatus('error', error.message);
-    }
-  });
-
-  ids.importIcs.addEventListener('click', async () => {
-    try {
-      await importCalendarDayFromIcs();
-    } catch (error) {
-      setStatus('error', error.message);
-      ids.calendarImportStatus.textContent = `Import failed: ${error.message}`;
     }
   });
 

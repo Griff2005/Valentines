@@ -7,7 +7,12 @@ const path = require('path');
 const { getState, saveState, normalizeState } = require('./services/stateStore');
 const { buildPayload } = require('./services/payloadBuilder');
 const { getCurrentWeather } = require('./services/weatherService');
-const { loadIcsEventsForDate, normalizeDateInput } = require('./services/calendarService');
+const {
+  loadCsvEvents,
+  loadCsvEventsForDate,
+  loadCsvEventsFromDate,
+  normalizeDateInput
+} = require('./services/calendarService');
 const {
   testConnection,
   installPiScript,
@@ -154,17 +159,44 @@ app.get(
   '/api/calendar/day',
   asyncHandler(async (req, res) => {
     const date = normalizeDateInput(req.query?.date);
-    const requestedFile = String(req.query?.file || 'schedule.2026WI.ics').trim() || 'schedule.2026WI.ics';
+    const requestedFile = String(req.query?.file || 'schedule.csv').trim() || 'schedule.csv';
     const filePath = path.isAbsolute(requestedFile)
       ? requestedFile
       : path.join(__dirname, requestedFile);
 
-    const calendar = await loadIcsEventsForDate(filePath, date);
+    const calendar = await loadCsvEventsForDate(filePath, date);
     res.json({
       ok: true,
       date: calendar.date,
       events: calendar.events,
       totalEventsInFile: calendar.totalEventsInFile,
+      file: requestedFile
+    });
+  })
+);
+
+app.get(
+  '/api/calendar/events',
+  asyncHandler(async (req, res) => {
+    const date = normalizeDateInput(req.query?.from);
+    const requestedFile = String(req.query?.file || 'schedule.csv').trim() || 'schedule.csv';
+    const includePast = String(req.query?.includePast || '').trim() === '1';
+    const filePath = path.isAbsolute(requestedFile)
+      ? requestedFile
+      : path.join(__dirname, requestedFile);
+
+    const calendar = includePast
+      ? {
+          date: '1900-01-01',
+          events: await loadCsvEvents(filePath)
+        }
+      : await loadCsvEventsFromDate(filePath, date);
+
+    res.json({
+      ok: true,
+      from: includePast ? '1900-01-01' : calendar.date,
+      events: calendar.events,
+      totalEventsInFile: includePast ? calendar.events.length : calendar.totalEventsInFile,
       file: requestedFile
     });
   })

@@ -139,6 +139,7 @@
                     <label class="checkbox inline"><input id="calendar-enabled" type="checkbox" /> Enabled</label>
                   </div>
                   <p class="hint">Board shows only the next upcoming event (time + program + course number).</p>
+                  <p class="hint">Schedule data auto-loads from <code>schedule.csv</code> for upcoming dates.</p>
                   <label>
                     <span>Calendar Day</span>
                     <input id="calendar-day" type="date" />
@@ -149,7 +150,6 @@
                     <button id="calendar-jump-week" class="btn btn-ghost">+7 Days</button>
                   </div>
                   <div class="button-row">
-                    <button id="import-ics" class="btn btn-ghost">Import Day From schedule.2026WI.ics</button>
                     <button id="add-event" class="btn btn-ghost">Add Event</button>
                   </div>
                   <p id="calendar-import-status" class="hint"></p>
@@ -270,7 +270,7 @@
           <input type="time" data-role="time" />
           <button data-role="remove" class="btn btn-danger">Remove</button>
         </div>
-        <input type="text" data-role="title" placeholder="Course code (e.g. COSC220)" maxlength="20" />
+        <input type="text" data-role="title" placeholder="Program+number (e.g. PSYC1001)" maxlength="20" />
       </div>
     </template>
 
