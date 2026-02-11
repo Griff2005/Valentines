@@ -149,6 +149,16 @@ def draw_text(canvas, x, y, text, color):
         cursor += 4
 
 
+def draw_text_todo(canvas, x, y, text, color, space_advance=3):
+    cursor = x
+    for char in str(text or ''):
+        if char == ' ':
+            cursor += space_advance
+            continue
+        draw_char(canvas, cursor, y, char, color)
+        cursor += 4
+
+
 def text_width(text):
     return len(str(text or '')) * 4
 
@@ -460,7 +470,7 @@ def run_widgets(matrix, payload):
         else:
             for item in todo_items[:3]:
                 draw_todo_bullet(canvas, 1, todo_y, todo_style)
-                draw_text(canvas, 7, todo_y, fit_text(item.get('text', ''), 10), text_color)
+                draw_text_todo(canvas, 7, todo_y, fit_text(item.get('text', ''), 10), text_color, 3)
                 todo_y += 6
 
         # Bottom-right: one upcoming calendar event.

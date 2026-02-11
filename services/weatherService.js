@@ -146,6 +146,26 @@ function parseLocationQuery(city) {
   };
 }
 
+function canonicalizeLocation(city) {
+  const input = normalizeText(city);
+  const normalized = input.toLowerCase().replace(/\s+/g, ' ').trim();
+
+  if (!normalized) {
+    return '';
+  }
+
+  // Disambiguate the default board city explicitly.
+  const isPeterborough = /^peterborough(?:,.*)?$/.test(normalized);
+  const mentionsOntario = /ontario|\bon\b/.test(normalized);
+  const mentionsCanada = /canada|\bca\b/.test(normalized);
+
+  if (isPeterborough && (!mentionsOntario || !mentionsCanada)) {
+    return 'Peterborough, Ontario, Canada';
+  }
+
+  return input;
+}
+
 function inferCountryCode(hintTokens) {
   const hints = new Set(hintTokens.map((token) => token.toLowerCase()));
   if (hints.has('canada') || hints.has('ca') || hints.has('ontario') || hints.has('on')) {
@@ -214,7 +234,7 @@ function scorePlace(place, queryName, hintTokens) {
 }
 
 async function geocodeCityOpenMeteo(city) {
-  const parsed = parseLocationQuery(city);
+  const parsed = parseLocationQuery(canonicalizeLocation(city));
   const countryCode = inferCountryCode(parsed.hintTokens);
 
   const geoUrl = new URL('https://geocoding-api.open-meteo.com/v1/search');
@@ -278,7 +298,7 @@ function formatWttrLocation(area) {
 }
 
 async function getWeatherFromWttr({ city, unit }) {
-  const location = normalizeText(city);
+  const location = canonicalizeLocation(city);
   if (!location) {
     throw new Error('City is required for weather lookup.');
   }
@@ -311,7 +331,7 @@ async function getWeatherFromWttr({ city, unit }) {
 
 async function getCurrentWeather({ city, unit }) {
   const normalizedUnit = normalizeUnit(unit);
-  const location = normalizeText(city);
+  const location = canonicalizeLocation(city);
 
   if (!location) {
     throw new Error('City is required for weather lookup.');
