@@ -182,35 +182,58 @@ async function pushPayload(piConfig, payload) {
   const py = escapeSingleQuotes(config.pythonCommand);
   const scriptPath = escapeSingleQuotes(config.remoteScriptPath);
   const processPattern = escapeSingleQuotes(buildProcessPattern(config.remoteScriptPath));
-  const sudoPrefix = config.useSudo ? 'sudo ' : '';
+  const sudoPrefix = config.useSudo ? 'sudo -n ' : '';
 
-  const commandLines = [
-    `pkill -f '${processPattern}' >/dev/null 2>&1 || true`,
-    `nohup ${sudoPrefix}${py} '${scriptPath}' --runner --payload-b64 '${payloadB64}' > /tmp/lrdigiboard.log 2>&1 &`,
-    'sleep 0.35',
-    `if pgrep -f '${processPattern}' >/dev/null; then`,
-    '  echo __STATUS__:started',
-    'else',
-    '  echo __STATUS__:failed',
-    '  if [ -f /tmp/lrdigiboard.log ]; then',
-    '    tail -n 40 /tmp/lrdigiboard.log',
-    '  fi',
-    'fi'
-  ];
+  return withConnection(config, async (conn) => {
+    const stopResult = await execCommand(
+      conn,
+      `bash -lc "pkill -f '${processPattern}' >/dev/null 2>&1 || true"`
+    );
 
-  const command = `bash -lc '${escapeSingleQuotes(commandLines.join('\n'))}'`;
+    const launchResult = await execCommand(
+      conn,
+      `bash -lc "nohup ${sudoPrefix}${py} '${scriptPath}' --runner --payload-b64 '${payloadB64}' > /tmp/lrdigiboard.log 2>&1 < /dev/null & echo __LAUNCH__:ok"`
+    );
 
-  const result = await withConnection(config, (conn) => execCommand(conn, command));
+    const probeResult = await execCommand(
+      conn,
+      `bash -lc "sleep 0.45; if pgrep -f '${processPattern}' >/dev/null 2>&1; then echo __STATUS__:started; else echo __STATUS__:failed; fi"`
+    );
 
-  return {
-    ...result,
-    started: result.stdout.includes('__STATUS__:started'),
-    status: result.stdout.includes('__STATUS__:started')
-      ? 'started'
-      : result.stdout.includes('__STATUS__:failed')
-        ? 'failed'
-        : 'unknown'
-  };
+    const started = [probeResult.stdout, probeResult.stderr]
+      .filter(Boolean)
+      .join('\n')
+      .includes('__STATUS__:started');
+
+    let status = started ? 'started' : 'failed';
+    let diagResult = { stdout: '', stderr: '', exitCode: 0 };
+
+    if (!started) {
+      diagResult = await execCommand(
+        conn,
+        `bash -lc "if [ -f /tmp/lrdigiboard.log ]; then tail -n 80 /tmp/lrdigiboard.log; else echo __LOG__:missing /tmp/lrdigiboard.log; fi"`
+      );
+
+      const statusFromProbe = [probeResult.stdout, probeResult.stderr]
+        .filter(Boolean)
+        .join('\n');
+      if (!statusFromProbe.includes('__STATUS__:failed')) {
+        status = 'unknown';
+      }
+    }
+
+    return {
+      exitCode: started ? 0 : probeResult.exitCode || launchResult.exitCode || 1,
+      stdout: [stopResult.stdout, launchResult.stdout, probeResult.stdout, diagResult.stdout]
+        .filter(Boolean)
+        .join('\n'),
+      stderr: [stopResult.stderr, launchResult.stderr, probeResult.stderr, diagResult.stderr]
+        .filter(Boolean)
+        .join('\n'),
+      started,
+      status
+    };
+  });
 }
 
 module.exports = {
