@@ -349,17 +349,24 @@ def format_event_time(value):
     return '00:00'
 
 
-def format_course_code(value, max_chars=5):
+def split_course_parts(value, program_max_chars=5, number_max_chars=4):
     text = str(value or '').strip().upper()
     if not text:
-        return ''
+        return ('', '')
 
-    structured = re.search(r'[A-Z]{2,}\s*\d{2,}', text)
+    structured = re.search(r'([A-Z]{2,})\s*([0-9]{2,}[A-Z]?)', text)
     if structured:
-        return re.sub(r'\s+', '', structured.group(0))[:max_chars]
+        return (
+            structured.group(1)[:program_max_chars],
+            structured.group(2)[:number_max_chars],
+        )
 
     compact = re.sub(r'[^A-Z0-9]', '', text)
-    return compact[:max_chars]
+    letters_match = re.match(r'[A-Z]+', compact)
+    numbers_match = re.search(r'[0-9][0-9A-Z]*$', compact)
+    program = (letters_match.group(0) if letters_match else compact)[:program_max_chars]
+    number = (numbers_match.group(0) if numbers_match else '')[:number_max_chars]
+    return (program, number)
 
 
 def next_upcoming_event(events):
@@ -457,7 +464,7 @@ def run_widgets(matrix, payload):
                 draw_text(canvas, 7, todo_y, fit_text(item.get('text', ''), 10), text_color)
                 todo_y += 6
 
-        # Bottom-right: one upcoming calendar event (time + course code)
+        # Bottom-right: one upcoming calendar event.
         panel_x = divider_x + 2
         draw_text_compact(canvas, panel_x, 9, 'NEXT', title_color)
         if not calendar.get('enabled', True):
@@ -467,9 +474,10 @@ def run_widgets(matrix, payload):
             if not event:
                 draw_text_compact(canvas, panel_x, 15, 'FREE', muted_color)
             else:
-                draw_text_compact(canvas, panel_x, 15, event['time'], text_color)
-                course_code = format_course_code(event['title'], 5) or 'CLASS'
-                draw_text_compact(canvas, panel_x, 21, course_code, text_color)
+                draw_text_compact(canvas, panel_x, 14, event['time'], text_color)
+                program, number = split_course_parts(event['title'], 5, 4)
+                draw_text_compact(canvas, panel_x, 20, program or 'CLASS', text_color)
+                draw_text_compact(canvas, panel_x, 26, number or '----', text_color)
 
         canvas = matrix.SwapOnVSync(canvas)
         time.sleep(0.25)
@@ -581,12 +589,6 @@ def run_valentine(matrix, payload):
 
     while RUNNING:
         clear(canvas)
-
-        # Soft pink glow band behind the question.
-        for y in range(0, 12):
-            factor = max(0.0, 1.0 - (y / 14.0))
-            color = scale_color((120, 30, 90), factor)
-            draw_hline(canvas, 0, matrix.width - 1, y, color)
 
         question_lines = wrap_text(question, 15, 3)
         if not question_lines:

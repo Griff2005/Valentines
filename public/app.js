@@ -57,6 +57,7 @@ const ids = {
 
   valentineQuestion: document.getElementById('valentine-question'),
   valentineFireworks: document.getElementById('valentine-fireworks'),
+  valentineStopFireworks: document.getElementById('valentine-stop-fireworks'),
 
   pixelColor: document.getElementById('pixel-color'),
   pixelErase: document.getElementById('pixel-erase'),
@@ -211,18 +212,26 @@ function sortCalendarEvents(events) {
   });
 }
 
-function toCourseCode(value, maxLength = 8) {
+function splitCourseParts(value, programMaxLength = 5, numberMaxLength = 4) {
   const text = String(value || '').trim().toUpperCase();
   if (!text) {
-    return '';
+    return { program: '', number: '' };
   }
 
-  const structured = text.match(/[A-Z]{2,}\s*\d{2,}/);
+  const structured = text.match(/([A-Z]{2,})\s*([0-9]{2,}[A-Z]?)/);
   if (structured) {
-    return structured[0].replace(/\s+/g, '').slice(0, maxLength);
+    return {
+      program: structured[1].slice(0, programMaxLength),
+      number: structured[2].slice(0, numberMaxLength)
+    };
   }
 
-  return text.replace(/[^A-Z0-9]/g, '').slice(0, maxLength);
+  const compact = text.replace(/[^A-Z0-9]/g, '');
+  const letterMatch = compact.match(/^[A-Z]+/);
+  const numberMatch = compact.match(/[0-9][0-9A-Z]*$/);
+  const program = (letterMatch ? letterMatch[0] : compact).slice(0, programMaxLength);
+  const number = (numberMatch ? numberMatch[0] : '').slice(0, numberMaxLength);
+  return { program, number };
 }
 
 function nextUpcomingEvent(events, now = new Date()) {
@@ -531,9 +540,10 @@ function drawWidgetPreview(width, height) {
     return;
   }
 
-  const courseCode = toCourseCode(nextEvent.title, 8) || 'CLASS';
-  previewCtx.fillText(nextEvent.time, dividerX + 12, height * 0.48);
-  previewCtx.fillText(courseCode, dividerX + 12, height * 0.62);
+  const parts = splitCourseParts(nextEvent.title, 5, 4);
+  previewCtx.fillText(nextEvent.time, dividerX + 12, height * 0.46);
+  previewCtx.fillText(parts.program || 'CLASS', dividerX + 12, height * 0.58);
+  previewCtx.fillText(parts.number || '----', dividerX + 12, height * 0.7);
 }
 
 function drawPreviewLedCell(x, y, sx, sy, color) {
@@ -588,9 +598,6 @@ function drawValentinePreview(width, height, sx, sy) {
   background.addColorStop(1, '#3f0f31');
   previewCtx.fillStyle = background;
   previewCtx.fillRect(0, 0, width, height);
-
-  previewCtx.fillStyle = 'rgba(255, 190, 230, 0.22)';
-  previewCtx.fillRect(0, 0, width, 64);
 
   previewCtx.fillStyle = '#ffd8f0';
   previewCtx.font = '700 34px Space Grotesk';
@@ -881,6 +888,18 @@ function registerEvents() {
     ensureValentineState();
     appState.board.valentine.fireworks = true;
     valentinePreviewPhase = 0;
+    drawPreview();
+
+    try {
+      await pushMode('valentine');
+    } catch (error) {
+      setStatus('error', error.message);
+    }
+  });
+
+  ids.valentineStopFireworks.addEventListener('click', async () => {
+    ensureValentineState();
+    appState.board.valentine.fireworks = false;
     drawPreview();
 
     try {
