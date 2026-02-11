@@ -149,7 +149,7 @@ def draw_text(canvas, x, y, text, color):
         cursor += 4
 
 
-def draw_text_todo(canvas, x, y, text, color, space_advance=3):
+def draw_text_todo(canvas, x, y, text, color, space_advance=1):
     cursor = x
     for char in str(text or ''):
         if char == ' ':
@@ -161,6 +161,13 @@ def draw_text_todo(canvas, x, y, text, color, space_advance=3):
 
 def text_width(text):
     return len(str(text or '')) * 4
+
+
+def drawn_text_width(text, advance=4):
+    raw = str(text or '')
+    if not raw:
+        return 0
+    return len(raw) * advance - 1
 
 
 def draw_text_compact(canvas, x, y, text, color):
@@ -442,16 +449,23 @@ def run_widgets(matrix, payload):
             icon_name = str(weather.get('icon', 'cloud') or 'cloud')
             if icon_name.lower() == 'sun' and (now.hour < 6 or now.hour >= 18):
                 icon_name = 'moon'
-            weather_block_width = text_width(draw_temp_text) + 1 + 5
+            temp_text_width = drawn_text_width(draw_temp_text, 4)
+            weather_block_width = temp_text_width + 1 + 5
             weather_x = matrix.width - weather_block_width - 1
-            if weather_x <= 1 + text_width(clock_text) + 1:
-                short_date = f"{now.strftime('%b').upper()}{now.day}"
-                clock_text = f"{time_text} {short_date}"
-            if weather_x <= 1 + text_width(clock_text) + 1:
-                clock_text = time_text
+
+            short_date = f"{now.strftime('%b').upper()}{now.day}"
+            options = [f"{time_text} {date_text}", f"{time_text} {short_date}", time_text]
+            clock_left = 1
+            max_clock_width = weather_x - clock_left - 1
+
+            clock_text = time_text
+            for option in options:
+                if drawn_text_width(option, 4) <= max_clock_width:
+                    clock_text = option
+                    break
 
             draw_text(canvas, 1, 1, clock_text, (255, 242, 194))
-            icon_x = weather_x + text_width(draw_temp_text) + 1
+            icon_x = weather_x + temp_text_width + 1
             draw_text(canvas, weather_x, 1, draw_temp_text, (155, 236, 255))
             draw_weather_icon(canvas, icon_x, 1, icon_name)
         else:
