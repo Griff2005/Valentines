@@ -4,7 +4,15 @@ set -euo pipefail
 PROJECT_DIR="$HOME/rpi-rgb-led-matrix"
 
 sudo apt-get update
-sudo apt-get install -y git python3-dev python3-pip python3-pillow build-essential
+sudo apt-get install -y \
+  git \
+  python3-dev \
+  python3-pip \
+  python3-pillow \
+  python3-setuptools \
+  python3-wheel \
+  cython3 \
+  build-essential
 
 if [[ ! -d "$PROJECT_DIR" ]]; then
   git clone https://github.com/hzeller/rpi-rgb-led-matrix "$PROJECT_DIR"
