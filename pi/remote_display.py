@@ -468,7 +468,7 @@ def run_widgets(matrix, payload):
     title_color = (255, 210, 100)
     text_color = (214, 235, 255)
     muted_color = (130, 150, 166)
-    divider_x = 47
+    divider_x = 48
     divider_y = 7
     top_row_y = 1
     box_top_y = divider_y + 1
