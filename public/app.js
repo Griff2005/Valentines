@@ -79,6 +79,7 @@ let isDrawing = false;
 let eraserActive = false;
 let valentinePreviewPhase = 0;
 let previewTickerStarted = false;
+let weatherAutoTimer = null;
 
 function setStatus(type, text) {
   ids.statusPill.className = 'status-pill';
@@ -827,6 +828,83 @@ async function pushMode(mode) {
   return result;
 }
 
+async function pushModeSilently(mode) {
+  if (!appState) {
+    return;
+  }
+
+  syncStateFromForm();
+  appState.board.mode = mode;
+
+  try {
+    await api('/api/board/push', {
+      method: 'POST',
+      body: JSON.stringify({
+        mode,
+        state: appState
+      })
+    });
+  } catch (_error) {
+    // Silent auto-refresh failures should not interrupt the UI.
+  }
+}
+
+async function refreshWeatherData({ showStatus = true, saveState = false, pushIfWidgets = false } = {}) {
+  if (!appState || !appState.board?.widgets?.weather) {
+    return false;
+  }
+
+  syncStateFromForm();
+
+  if (!appState.board.widgets.weather.enabled) {
+    return false;
+  }
+
+  if (showStatus) {
+    setStatus('working', 'Fetching weather preview...');
+  }
+
+  try {
+    const weather = await api('/api/weather', {
+      method: 'POST',
+      body: JSON.stringify({
+        city: appState.board.widgets.weather.city,
+        unit: appState.board.widgets.weather.unit
+      })
+    });
+
+    const summary = `${weather.temp}${weather.unit} ${weatherIconSymbol(weather.icon)}`.trim();
+    ids.weatherPreview.textContent = summary;
+    appState.board.widgets.weather.summary = weather.summary;
+    appState.board.widgets.weather.icon = weather.icon;
+    appState.board.widgets.weather.temp = weather.temp;
+
+    if (saveState) {
+      const saved = await api('/api/state', {
+        method: 'PUT',
+        body: JSON.stringify(appState)
+      });
+      appState = saved;
+    }
+
+    drawPreview();
+
+    if (pushIfWidgets && appState.board.mode === 'widgets') {
+      await pushModeSilently('widgets');
+    }
+
+    if (showStatus) {
+      setStatus('success', 'Weather preview updated.');
+    }
+    return true;
+  } catch (error) {
+    if (showStatus) {
+      setStatus('error', error.message);
+    }
+    return false;
+  }
+}
+
 async function autoSyncCalendarFromCsv() {
   const from = todayDateString();
   const existing = Array.isArray(appState?.board?.widgets?.calendar?.events)
@@ -904,6 +982,16 @@ function startPreviewTicker() {
   }, 120);
 }
 
+function startWeatherAutoUpdate() {
+  if (weatherAutoTimer) {
+    return;
+  }
+
+  weatherAutoTimer = setInterval(() => {
+    refreshWeatherData({ showStatus: false, saveState: true, pushIfWidgets: true });
+  }, 30 * 60 * 1000);
+}
+
 async function init() {
   setStatus('working', 'Loading saved settings...');
   appState = await api('/api/state');
@@ -923,6 +1011,8 @@ async function init() {
   }
   drawPreview();
   startPreviewTicker();
+  startWeatherAutoUpdate();
+  refreshWeatherData({ showStatus: false, saveState: true, pushIfWidgets: false });
   setStatus('success', 'Ready. Update controls then click Show Current Tab on Board.');
 }
 
@@ -986,27 +1076,7 @@ function registerEvents() {
   });
 
   ids.refreshWeather.addEventListener('click', async () => {
-    try {
-      syncStateFromForm();
-      setStatus('working', 'Fetching weather preview...');
-      const weather = await api('/api/weather', {
-        method: 'POST',
-        body: JSON.stringify({
-          city: appState.board.widgets.weather.city,
-          unit: appState.board.widgets.weather.unit
-        })
-      });
-
-      const summary = `${weather.temp}${weather.unit} ${weatherIconSymbol(weather.icon)}`.trim();
-      ids.weatherPreview.textContent = summary;
-      appState.board.widgets.weather.summary = weather.summary;
-      appState.board.widgets.weather.icon = weather.icon;
-      appState.board.widgets.weather.temp = weather.temp;
-      setStatus('success', 'Weather preview updated.');
-      drawPreview();
-    } catch (error) {
-      setStatus('error', error.message);
-    }
+    await refreshWeatherData({ showStatus: true, saveState: true, pushIfWidgets: true });
   });
 
   ids.valentineFireworks.addEventListener('click', async () => {

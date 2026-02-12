@@ -455,7 +455,7 @@ def run_widgets(matrix, payload):
 
             short_date = f"{now.strftime('%b').upper()}{now.day}"
             options = [f"{time_text} {date_text}", f"{time_text} {short_date}", time_text]
-            clock_left = 1
+            clock_left = 0
             max_clock_width = weather_x - clock_left - 1
 
             clock_text = time_text
@@ -464,12 +464,12 @@ def run_widgets(matrix, payload):
                     clock_text = option
                     break
 
-            draw_text(canvas, 1, 1, clock_text, (255, 242, 194))
+            draw_text(canvas, 0, 1, clock_text, (255, 242, 194))
             icon_x = weather_x + temp_text_width + 1
             draw_text(canvas, weather_x, 1, draw_temp_text, (155, 236, 255))
             draw_weather_icon(canvas, icon_x, 1, icon_name)
         else:
-            draw_text(canvas, 1, 1, clock_text, (255, 242, 194))
+            draw_text(canvas, 0, 1, clock_text, (255, 242, 194))
             draw_text(canvas, matrix.width - text_width('OFF') - 1, 1, 'OFF', muted_color)
 
         # Bottom-left: todo list gets most of the width
@@ -484,22 +484,22 @@ def run_widgets(matrix, payload):
         else:
             for item in todo_items[:3]:
                 draw_todo_bullet(canvas, 1, todo_y, todo_style)
-                draw_text_todo(canvas, 7, todo_y, fit_text(item.get('text', ''), 10), text_color, 3)
+                draw_text_todo(canvas, 7, todo_y, fit_text(item.get('text', ''), 10), text_color, 2)
                 todo_y += 6
 
         # Bottom-right: one upcoming calendar event.
         panel_x = divider_x + 2
         if not calendar.get('enabled', True):
-            draw_text_compact(canvas, panel_x, 18, 'OFF', muted_color)
+            draw_text_compact(canvas, panel_x, 10, 'OFF', muted_color)
         else:
             event = next_upcoming_event(calendar.get('events', []))
             if not event:
-                draw_text_compact(canvas, panel_x, 18, 'FREE', muted_color)
+                draw_text_compact(canvas, panel_x, 10, 'FREE', muted_color)
             else:
-                draw_text_compact(canvas, panel_x, 12, event['time'], text_color)
+                draw_text_compact(canvas, panel_x, 10, event['time'], text_color)
                 program, number = split_course_parts(event['title'], 4, 4)
-                draw_text(canvas, panel_x, 18, program or 'CLAS', text_color)
-                draw_text(canvas, panel_x, 24, number or '----', text_color)
+                draw_text(canvas, panel_x, 16, program or 'CLAS', text_color)
+                draw_text(canvas, panel_x, 22, number or '----', text_color)
 
         canvas = matrix.SwapOnVSync(canvas)
         time.sleep(0.25)
