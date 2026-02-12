@@ -440,7 +440,10 @@ def run_widgets(matrix, payload):
         now = datetime.now()
         time_text = f"{now.hour}:{now.minute:02d}"
         date_text = f"{now.strftime('%b').upper()} {now.day}"
-        clock_text = f"{time_text} {date_text}"
+        short_date = f"{now.strftime('%b').upper()}{now.day}"
+        time_x = 1
+        date_gap = 3  # One pixel tighter than normal 4px character advance.
+        time_width = drawn_text_width(time_text, 4)
 
         if weather.get('enabled', True):
             temp_value = str(weather.get('temp', '--')).strip()
@@ -453,23 +456,25 @@ def run_widgets(matrix, payload):
             weather_block_width = temp_text_width + 1 + 5
             weather_x = matrix.width - weather_block_width - 1
 
-            short_date = f"{now.strftime('%b').upper()}{now.day}"
-            options = [f"{time_text} {date_text}", f"{time_text} {short_date}", time_text]
-            clock_left = 0
-            max_clock_width = weather_x - clock_left - 1
-
-            clock_text = time_text
-            for option in options:
-                if drawn_text_width(option, 4) <= max_clock_width:
-                    clock_text = option
+            max_clock_width = weather_x - time_x - 1
+            date_to_draw = ''
+            for option in [date_text, short_date]:
+                option_width = time_width + date_gap + drawn_text_width(option, 4)
+                if option_width <= max_clock_width:
+                    date_to_draw = option
                     break
 
-            draw_text(canvas, 0, 1, clock_text, (255, 242, 194))
+            draw_text(canvas, time_x, 1, time_text, (255, 242, 194))
+            if date_to_draw:
+                date_x = time_x + time_width + date_gap
+                draw_text(canvas, date_x, 1, date_to_draw, (255, 242, 194))
             icon_x = weather_x + temp_text_width + 1
             draw_text(canvas, weather_x, 1, draw_temp_text, (155, 236, 255))
             draw_weather_icon(canvas, icon_x, 1, icon_name)
         else:
-            draw_text(canvas, 0, 1, clock_text, (255, 242, 194))
+            draw_text(canvas, time_x, 1, time_text, (255, 242, 194))
+            date_x = time_x + time_width + date_gap
+            draw_text(canvas, date_x, 1, date_text, (255, 242, 194))
             draw_text(canvas, matrix.width - text_width('OFF') - 1, 1, 'OFF', muted_color)
 
         # Bottom-left: todo list gets most of the width
