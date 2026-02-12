@@ -427,14 +427,23 @@ def run_widgets(matrix, payload):
     text_color = (214, 235, 255)
     muted_color = (130, 150, 166)
     divider_x = 47
+    divider_y = 7
+    top_row_y = 1
+    box_top_y = divider_y + 1
+    box_content_y = box_top_y + 2  # 2px below box top.
+    line_gap = 6
+    date_gap = 2  # Pixel gap between time and date (move date 1px left vs previous).
+    todo_word_gap = 2  # Total pixel gap between words.
+    # draw_text_todo already leaves a 1px gap after each character; subtract it for spaces.
+    todo_space_advance = max(0, todo_word_gap - 1)
 
     canvas = matrix.CreateFrameCanvas()
 
     while RUNNING:
         clear(canvas)
 
-        draw_hline(canvas, 0, matrix.width - 1, 7, border)
-        draw_vline(canvas, divider_x, 8, matrix.height - 1, border)
+        draw_hline(canvas, 0, matrix.width - 1, divider_y, border)
+        draw_vline(canvas, divider_x, box_top_y, matrix.height - 1, border)
 
         # Top row: live time + date + weather
         now = datetime.now()
@@ -442,7 +451,6 @@ def run_widgets(matrix, payload):
         date_text = f"{now.strftime('%b').upper()} {now.day}"
         short_date = f"{now.strftime('%b').upper()}{now.day}"
         time_x = 1
-        date_gap = 3  # One pixel tighter than normal 4px character advance.
         time_width = drawn_text_width(time_text, 4)
 
         if weather.get('enabled', True):
@@ -456,7 +464,7 @@ def run_widgets(matrix, payload):
             weather_block_width = temp_text_width + 1 + 5
             weather_x = matrix.width - weather_block_width - 1
 
-            max_clock_width = weather_x - time_x - 1
+            max_clock_width = weather_x - time_x
             date_to_draw = ''
             for option in [date_text, short_date]:
                 option_width = time_width + date_gap + drawn_text_width(option, 4)
@@ -464,23 +472,23 @@ def run_widgets(matrix, payload):
                     date_to_draw = option
                     break
 
-            draw_text(canvas, time_x, 1, time_text, (255, 242, 194))
+            draw_text(canvas, time_x, top_row_y, time_text, (255, 242, 194))
             if date_to_draw:
                 date_x = time_x + time_width + date_gap
-                draw_text(canvas, date_x, 1, date_to_draw, (255, 242, 194))
+                draw_text(canvas, date_x, top_row_y, date_to_draw, (255, 242, 194))
             icon_x = weather_x + temp_text_width + 1
-            draw_text(canvas, weather_x, 1, draw_temp_text, (155, 236, 255))
-            draw_weather_icon(canvas, icon_x, 1, icon_name)
+            draw_text(canvas, weather_x, top_row_y, draw_temp_text, (155, 236, 255))
+            draw_weather_icon(canvas, icon_x, top_row_y, icon_name)
         else:
-            draw_text(canvas, time_x, 1, time_text, (255, 242, 194))
+            draw_text(canvas, time_x, top_row_y, time_text, (255, 242, 194))
             date_x = time_x + time_width + date_gap
-            draw_text(canvas, date_x, 1, date_text, (255, 242, 194))
-            draw_text(canvas, matrix.width - text_width('OFF') - 1, 1, 'OFF', muted_color)
+            draw_text(canvas, date_x, top_row_y, date_text, (255, 242, 194))
+            draw_text(canvas, matrix.width - text_width('OFF') - 1, top_row_y, 'OFF', muted_color)
 
         # Bottom-left: todo list gets most of the width
         todo_items = todo.get('items', []) if todo.get('enabled', True) else []
         todo_style = todo.get('bulletStyle', 'dot')
-        todo_y = 10
+        todo_y = box_content_y
 
         if not todo.get('enabled', True):
             draw_text(canvas, 1, todo_y, 'OFF', muted_color)
@@ -489,22 +497,22 @@ def run_widgets(matrix, payload):
         else:
             for item in todo_items[:3]:
                 draw_todo_bullet(canvas, 1, todo_y, todo_style)
-                draw_text_todo(canvas, 7, todo_y, fit_text(item.get('text', ''), 10), text_color, 2)
-                todo_y += 6
+                draw_text_todo(canvas, 7, todo_y, fit_text(item.get('text', ''), 10), text_color, todo_space_advance)
+                todo_y += line_gap
 
         # Bottom-right: one upcoming calendar event.
         panel_x = divider_x + 2
         if not calendar.get('enabled', True):
-            draw_text_compact(canvas, panel_x, 10, 'OFF', muted_color)
+            draw_text_compact(canvas, panel_x, box_content_y, 'OFF', muted_color)
         else:
             event = next_upcoming_event(calendar.get('events', []))
             if not event:
-                draw_text_compact(canvas, panel_x, 10, 'FREE', muted_color)
+                draw_text_compact(canvas, panel_x, box_content_y, 'FREE', muted_color)
             else:
-                draw_text_compact(canvas, panel_x, 10, event['time'], text_color)
+                draw_text_compact(canvas, panel_x, box_content_y, event['time'], text_color)
                 program, number = split_course_parts(event['title'], 4, 4)
-                draw_text(canvas, panel_x, 16, program or 'CLAS', text_color)
-                draw_text(canvas, panel_x, 22, number or '----', text_color)
+                draw_text(canvas, panel_x, box_content_y + line_gap, program or 'CLAS', text_color)
+                draw_text(canvas, panel_x, box_content_y + (2 * line_gap), number or '----', text_color)
 
         canvas = matrix.SwapOnVSync(canvas)
         time.sleep(0.25)
