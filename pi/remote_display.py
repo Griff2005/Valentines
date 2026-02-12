@@ -585,7 +585,7 @@ def run_widgets(matrix, payload):
 
 
 def run_clock(matrix, payload):
-    scale = 3
+    scale = 4
     gap = 1
     color = (255, 90, 90)
 
