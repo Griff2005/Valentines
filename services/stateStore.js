@@ -189,6 +189,14 @@ function normalizeState(inputState) {
     fireworks: Boolean(valentine.fireworks)
   };
 
+  const clockSchedule = merged.board.clockSchedule || {};
+  merged.board.clockSchedule = {
+    enabled: clockSchedule.enabled !== false,
+    nightStart: sanitizeTime(clockSchedule.nightStart) || '22:00',
+    dayStart: sanitizeTime(clockSchedule.dayStart) || '11:00',
+    brightness: clampInteger(clockSchedule.brightness, 10, 100, 40)
+  };
+
   merged.pi.matrixOptions = sanitizeMatrixOptions(merged.pi.matrixOptions);
 
   return merged;

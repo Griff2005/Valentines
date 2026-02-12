@@ -62,6 +62,12 @@ const defaultState = {
       question: 'Will you be my Valentine?',
       fireworks: false
     },
+    clockSchedule: {
+      enabled: true,
+      nightStart: '22:00',
+      dayStart: '11:00',
+      brightness: 40
+    },
     pixels: {
       data: createBlankPixels(),
       background: '#000000'

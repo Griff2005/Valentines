@@ -54,6 +54,12 @@ const ids = {
   animationSpeed: document.getElementById('animation-speed'),
   animationSpeedValue: document.getElementById('animation-speed-value'),
 
+  clockScheduleEnabled: document.getElementById('clock-schedule-enabled'),
+  clockNightStart: document.getElementById('clock-night-start'),
+  clockDayStart: document.getElementById('clock-day-start'),
+  clockBrightness: document.getElementById('clock-brightness'),
+  clockBrightnessValue: document.getElementById('clock-brightness-value'),
+
   valentineQuestion: document.getElementById('valentine-question'),
   valentineFireworks: document.getElementById('valentine-fireworks'),
   valentineStopFireworks: document.getElementById('valentine-stop-fireworks'),
@@ -160,6 +166,27 @@ function ensureValentineState() {
   appState.board.valentine.question =
     String(appState.board.valentine.question || '').trim().slice(0, 80) || 'Will you be my Valentine?';
   appState.board.valentine.fireworks = Boolean(appState.board.valentine.fireworks);
+}
+
+function ensureClockScheduleState() {
+  if (!appState.board.clockSchedule || typeof appState.board.clockSchedule !== 'object') {
+    appState.board.clockSchedule = {
+      enabled: true,
+      nightStart: '22:00',
+      dayStart: '11:00',
+      brightness: 40
+    };
+    return;
+  }
+
+  const schedule = appState.board.clockSchedule;
+  schedule.enabled = schedule.enabled !== false;
+  schedule.nightStart = safeTime(schedule.nightStart) || '22:00';
+  schedule.dayStart = safeTime(schedule.dayStart) || '11:00';
+  const brightness = Number(schedule.brightness);
+  schedule.brightness = Number.isFinite(brightness)
+    ? Math.min(100, Math.max(10, Math.round(brightness)))
+    : 40;
 }
 
 function safeDate(value) {
@@ -441,6 +468,7 @@ function collectTodoItems() {
 
 function populateFormFromState() {
   ensureValentineState();
+  ensureClockScheduleState();
 
   ids.piHost.value = appState.pi.host || '';
   ids.piPort.value = String(appState.pi.port || 22);
@@ -478,6 +506,13 @@ function populateFormFromState() {
   ids.animationPreset.value = appState.board.animation.preset || 'rainbowWave';
   ids.animationSpeed.value = String(appState.board.animation.speed || 35);
   ids.animationSpeedValue.textContent = ids.animationSpeed.value;
+
+  const schedule = appState.board.clockSchedule;
+  ids.clockScheduleEnabled.checked = Boolean(schedule.enabled);
+  ids.clockNightStart.value = schedule.nightStart || '22:00';
+  ids.clockDayStart.value = schedule.dayStart || '11:00';
+  ids.clockBrightness.value = String(schedule.brightness ?? 40);
+  ids.clockBrightnessValue.textContent = ids.clockBrightness.value;
 
   ids.valentineQuestion.value = appState.board.valentine?.question || 'Will you be my Valentine?';
 
@@ -530,12 +565,20 @@ function syncStateFromForm() {
   appState.board.animation.preset = ids.animationPreset.value;
   appState.board.animation.speed = Number(ids.animationSpeed.value) || 35;
 
+  appState.board.clockSchedule = {
+    enabled: ids.clockScheduleEnabled.checked,
+    nightStart: safeTime(ids.clockNightStart.value) || '22:00',
+    dayStart: safeTime(ids.clockDayStart.value) || '11:00',
+    brightness: Number(ids.clockBrightness.value) || 40
+  };
+
   appState.board.valentine.question =
     ids.valentineQuestion.value.trim().slice(0, 80) || 'Will you be my Valentine?';
 
   ids.brightnessValue.textContent = String(appState.board.brightness);
   ids.messageSpeedValue.textContent = String(appState.board.message.speed);
   ids.animationSpeedValue.textContent = String(appState.board.animation.speed);
+  ids.clockBrightnessValue.textContent = String(appState.board.clockSchedule.brightness);
 }
 
 function colorFromInput() {
@@ -1014,7 +1057,7 @@ function startWeatherAutoUpdate() {
 
   weatherAutoTimer = setInterval(() => {
     refreshWeatherData({ showStatus: false, saveState: true, pushIfWidgets: true });
-  }, 30 * 60 * 1000);
+  }, 15 * 60 * 1000);
 }
 
 async function init() {
@@ -1197,6 +1240,10 @@ function registerEvents() {
     ids.messageSpeed,
     ids.animationPreset,
     ids.animationSpeed,
+    ids.clockScheduleEnabled,
+    ids.clockNightStart,
+    ids.clockDayStart,
+    ids.clockBrightness,
     ids.valentineQuestion,
     ids.brightness
   ].forEach((element) => {

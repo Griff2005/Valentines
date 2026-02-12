@@ -24,9 +24,9 @@ const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 const BASIC_AUTH_USER = process.env.BASIC_AUTH_USER || '';
 const BASIC_AUTH_PASS = process.env.BASIC_AUTH_PASS || '';
-const AUTO_CLOCK_NIGHT_START = 22;
-const AUTO_CLOCK_DAY_START = 11;
-const AUTO_CLOCK_NIGHT_BRIGHTNESS = 40;
+const AUTO_CLOCK_DEFAULT_NIGHT_START = '22:00';
+const AUTO_CLOCK_DEFAULT_DAY_START = '11:00';
+const AUTO_CLOCK_DEFAULT_BRIGHTNESS = 40;
 
 const app = express();
 
@@ -109,10 +109,46 @@ function clampBrightness(value, fallback = 70) {
   return Math.min(100, Math.max(10, Math.round(number)));
 }
 
+function parseTimeToMinutes(value, fallbackMinutes) {
+  const text = String(value || '').trim();
+  if (!/^\d{2}:\d{2}$/.test(text)) {
+    return fallbackMinutes;
+  }
+  const [hoursText, minutesText] = text.split(':');
+  const hours = Number(hoursText);
+  const minutes = Number(minutesText);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+    return fallbackMinutes;
+  }
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return fallbackMinutes;
+  }
+  return hours * 60 + minutes;
+}
+
+function isNightWindowMinutes(nowMinutes, nightStartMinutes, dayStartMinutes) {
+  if (nightStartMinutes === dayStartMinutes) {
+    return true;
+  }
+  if (nightStartMinutes < dayStartMinutes) {
+    return nowMinutes >= nightStartMinutes && nowMinutes < dayStartMinutes;
+  }
+  return nowMinutes >= nightStartMinutes || nowMinutes < dayStartMinutes;
+}
+
+function getNightKey(now, nowMinutes, nightStartMinutes, dayStartMinutes) {
+  const crossesMidnight = nightStartMinutes > dayStartMinutes;
+  if (crossesMidnight && nowMinutes < dayStartMinutes) {
+    const previous = new Date(now);
+    previous.setDate(now.getDate() - 1);
+    return localDateString(previous);
+  }
+  return localDateString(now);
+}
+
 async function runAutoClockSchedule() {
   const now = new Date();
-  const hour = now.getHours();
-  const isNightWindow = hour >= AUTO_CLOCK_NIGHT_START || hour < AUTO_CLOCK_DAY_START;
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const today = localDateString(now);
 
   const state = await getState();
@@ -120,10 +156,27 @@ async function runAutoClockSchedule() {
     return;
   }
 
+  const schedule = state.board.clockSchedule || {};
+  if (!schedule.enabled) {
+    return;
+  }
+
+  const nightStartMinutes = parseTimeToMinutes(
+    schedule.nightStart,
+    parseTimeToMinutes(AUTO_CLOCK_DEFAULT_NIGHT_START, 22 * 60)
+  );
+  const dayStartMinutes = parseTimeToMinutes(
+    schedule.dayStart,
+    parseTimeToMinutes(AUTO_CLOCK_DEFAULT_DAY_START, 11 * 60)
+  );
+  const clockBrightness = clampBrightness(schedule.brightness, AUTO_CLOCK_DEFAULT_BRIGHTNESS);
+  const isNightWindow = isNightWindowMinutes(nowMinutes, nightStartMinutes, dayStartMinutes);
+  const nightKey = getNightKey(now, nowMinutes, nightStartMinutes, dayStartMinutes);
+
   const auto = state.board.autoSchedule || { lastNight: '', lastDay: '' };
 
   if (isNightWindow) {
-    if (auto.lastNight === today) {
+    if (auto.lastNight === nightKey) {
       return;
     }
 
@@ -133,11 +186,11 @@ async function runAutoClockSchedule() {
       board: {
         ...state.board,
         mode: 'clock',
-        brightness: AUTO_CLOCK_NIGHT_BRIGHTNESS,
+        brightness: clockBrightness,
         dayBrightness,
         autoSchedule: {
           ...auto,
-          lastNight: today
+          lastNight: nightKey
         }
       }
     };
@@ -149,7 +202,7 @@ async function runAutoClockSchedule() {
       return;
     }
     await saveState(nextState);
-    console.log(`[auto] Switched to clock mode at ${today}`);
+    console.log(`[auto] Switched to clock mode at ${nightKey}`);
     return;
   }
 

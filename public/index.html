@@ -179,8 +179,30 @@
 
             <section id="tab-clock" class="tab-panel">
               <h3>Clock Mode</h3>
-              <p class="card-help">Full-screen clock display. Night schedule auto-switches to clock at 22:00 with 40% brightness and returns to widgets at 11:00.</p>
+              <p class="card-help">Full-screen clock display with an optional daily schedule.</p>
               <p class="hint">Click “Show Current Tab on Board” to push clock mode immediately.</p>
+
+              <div class="mini-card">
+                <div class="mini-head">
+                  <h4>Clock Schedule</h4>
+                  <label class="checkbox inline"><input id="clock-schedule-enabled" type="checkbox" /> Enabled</label>
+                </div>
+                <div class="field-grid">
+                  <label>
+                    <span>Clock Start</span>
+                    <input id="clock-night-start" type="time" value="22:00" />
+                  </label>
+                  <label>
+                    <span>Return to Widgets</span>
+                    <input id="clock-day-start" type="time" value="11:00" />
+                  </label>
+                </div>
+                <label>
+                  <span>Clock Brightness <strong id="clock-brightness-value">40</strong>%</span>
+                  <input id="clock-brightness" type="range" min="10" max="100" step="1" value="40" />
+                </label>
+                <p class="hint">When enabled, the board switches to clock at the start time and back to widgets at the return time.</p>
+              </div>
             </section>
 
             <section id="tab-message" class="tab-panel">

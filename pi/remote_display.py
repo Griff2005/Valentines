@@ -352,7 +352,7 @@ def draw_weather_icon(canvas, x, y, icon_name):
     icon = str(icon_name or 'cloud').lower()
 
     if icon == 'sun':
-        color = (255, 206, 40)
+        color = (255, 245, 0)
         pattern = ['00100', '10101', '01110', '10101', '00100']
     elif icon == 'moon':
         color = (230, 230, 255)
