@@ -201,3 +201,15 @@ sudo systemctl restart love-board
 3. Click **Install Pi Script**.
 4. Choose a tab (Widgets, Full Message, Animation, Pixel Painter).
 5. Click **Show Current Tab on Board**.
+
+### CLI Push (Optional)
+
+If the web server is running, you can push a mode from the terminal:
+
+```bash
+./pushBoard.sh widgets
+# or
+python3 pushBoard.py widgets --host 127.0.0.1 --port 3000
+```
+
+Supported modes: `widgets`, `message`, `animation`, `valentine`, `pixels`.
