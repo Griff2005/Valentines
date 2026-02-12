@@ -468,7 +468,7 @@ def run_widgets(matrix, payload):
     title_color = (255, 210, 100)
     text_color = (214, 235, 255)
     muted_color = (130, 150, 166)
-    divider_x = 48
+    divider_x = 47
     divider_y = 7
     top_row_y = 1
     box_top_y = divider_y + 1
@@ -551,7 +551,7 @@ def run_widgets(matrix, payload):
         todo_items = todo.get('items', []) if todo.get('enabled', True) else []
         todo_style = todo.get('bulletStyle', 'dot')
         todo_y = max(0, box_content_y - 1)
-        todo_text_x = 7
+        todo_text_x = 6
         todo_max_pixels = max(0, divider_x - todo_text_x)
 
         if not todo.get('enabled', True):
@@ -560,7 +560,7 @@ def run_widgets(matrix, payload):
             draw_text(canvas, 1, todo_y, 'NONE', muted_color)
         else:
             for item in todo_items[:3]:
-                draw_todo_bullet(canvas, 1, todo_y, todo_style)
+                draw_todo_bullet(canvas, 0, todo_y, todo_style)
                 todo_text = fit_todo_text(item.get('text', ''), todo_max_pixels, todo_space_advance)
                 draw_text_todo(canvas, todo_text_x, todo_y, todo_text, text_color, todo_space_advance)
                 todo_y += line_gap
