@@ -17,6 +17,7 @@ const ids = {
   piPass: document.getElementById('pi-pass'),
   piScriptPath: document.getElementById('pi-script-path'),
   piPython: document.getElementById('pi-python'),
+  piRgbSequence: document.getElementById('pi-rgb-sequence'),
   piSudo: document.getElementById('pi-sudo'),
   testConnection: document.getElementById('test-connection'),
   installScript: document.getElementById('install-script'),
@@ -476,6 +477,7 @@ function populateFormFromState() {
   ids.piPass.value = appState.pi.password || '';
   ids.piScriptPath.value = appState.pi.remoteScriptPath || '';
   ids.piPython.value = appState.pi.pythonCommand || 'python3';
+  ids.piRgbSequence.value = appState.pi.matrixOptions?.rgbSequence || 'RGB';
   ids.piSudo.checked = Boolean(appState.pi.useSudo);
 
   ids.brightness.value = String(appState.board.brightness || 70);
@@ -533,6 +535,10 @@ function syncStateFromForm() {
   appState.pi.password = ids.piPass.value;
   appState.pi.remoteScriptPath = ids.piScriptPath.value.trim();
   appState.pi.pythonCommand = ids.piPython.value.trim() || 'python3';
+  if (!appState.pi.matrixOptions || typeof appState.pi.matrixOptions !== 'object') {
+    appState.pi.matrixOptions = {};
+  }
+  appState.pi.matrixOptions.rgbSequence = (ids.piRgbSequence.value || 'RGB').toUpperCase();
   appState.pi.useSudo = ids.piSudo.checked;
 
   appState.board.brightness = Number(ids.brightness.value) || 70;
@@ -1227,6 +1233,7 @@ function registerEvents() {
     ids.piPass,
     ids.piScriptPath,
     ids.piPython,
+    ids.piRgbSequence,
     ids.piSudo,
     ids.weatherEnabled,
     ids.weatherCity,

@@ -49,6 +49,8 @@ function buildMatrixOptions(state) {
   const matrix = state.pi.matrixOptions || {};
   const rawMapping = typeof matrix.hardwareMapping === 'string' ? matrix.hardwareMapping.trim() : '';
   const hardwareMapping = rawMapping || 'regular';
+  const rawSequence = typeof matrix.rgbSequence === 'string' ? matrix.rgbSequence.trim().toUpperCase() : '';
+  const rgbSequence = rawSequence || 'RGB';
   let gpioSlowdown = clampNumber(matrix.gpioSlowdown, 0, 8, 4);
   if (hardwareMapping === 'regular' && gpioSlowdown < 4) {
     gpioSlowdown = 4;
@@ -59,6 +61,7 @@ function buildMatrixOptions(state) {
     cols: clampNumber(matrix.cols, 32, 128, 64),
     chainLength: clampNumber(matrix.chainLength, 1, 4, 1),
     parallel: clampNumber(matrix.parallel, 1, 3, 1),
+    rgbSequence,
     hardwareMapping,
     gpioSlowdown,
     noHardwarePulse: matrix.noHardwarePulse !== false,

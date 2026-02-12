@@ -122,9 +122,16 @@ function sanitizeHardwareMapping(value) {
   return allowed.has(normalized) ? normalized : 'regular';
 }
 
+function sanitizeRgbSequence(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  const allowed = new Set(['RGB', 'RBG', 'GRB', 'GBR', 'BRG', 'BGR']);
+  return allowed.has(normalized) ? normalized : 'RGB';
+}
+
 function sanitizeMatrixOptions(matrixOptions) {
   const matrix = isObject(matrixOptions) ? matrixOptions : {};
   const hardwareMapping = sanitizeHardwareMapping(matrix.hardwareMapping);
+  const rgbSequence = sanitizeRgbSequence(matrix.rgbSequence);
   let gpioSlowdown = clampInteger(matrix.gpioSlowdown, 0, 8, 4);
   if (hardwareMapping === 'regular' && gpioSlowdown < 4) {
     gpioSlowdown = 4;
@@ -135,6 +142,7 @@ function sanitizeMatrixOptions(matrixOptions) {
     cols: clampInteger(matrix.cols, 32, 128, 64),
     chainLength: clampInteger(matrix.chainLength, 1, 4, 1),
     parallel: clampInteger(matrix.parallel, 1, 3, 1),
+    rgbSequence,
     hardwareMapping,
     gpioSlowdown,
     noHardwarePulse: matrix.noHardwarePulse !== false,

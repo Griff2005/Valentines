@@ -248,6 +248,9 @@ def build_matrix(payload):
     options.chain_length = int(clamp(options_data.get('chainLength'), 1, 4, 1))
     options.parallel = int(clamp(options_data.get('parallel'), 1, 3, 1))
     options.hardware_mapping = str(options_data.get('hardwareMapping') or 'regular')
+    rgb_sequence = str(options_data.get('rgbSequence') or '').upper()
+    if rgb_sequence in ('RGB', 'RBG', 'GRB', 'GBR', 'BRG', 'BGR'):
+        options.rgb_sequence = rgb_sequence
     options.gpio_slowdown = int(clamp(options_data.get('gpioSlowdown'), 0, 8, 4))
     options.disable_hardware_pulsing = bool(options_data.get('noHardwarePulse', True))
     options.pwm_bits = int(clamp(options_data.get('pwmBits'), 1, 11, 11))

@@ -86,6 +86,7 @@ const defaultState = {
       cols: 64,
       chainLength: 1,
       parallel: 1,
+      rgbSequence: 'RGB',
       hardwareMapping: 'regular',
       gpioSlowdown: 4,
       noHardwarePulse: true,
