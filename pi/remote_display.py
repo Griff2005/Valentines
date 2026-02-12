@@ -306,6 +306,23 @@ def fit_text(value, max_chars):
     return text[:max_chars]
 
 
+def fit_todo_text(value, max_pixels, space_advance):
+    text = str(value or '').strip()
+    if not text:
+        return ''
+
+    allowed = []
+    width = 0
+    for char in text:
+        advance = space_advance if char == ' ' else 4
+        if width + advance > max_pixels:
+            break
+        allowed.append(char)
+        width += advance
+
+    return ''.join(allowed).rstrip()
+
+
 def draw_weather_icon(canvas, x, y, icon_name):
     icon = str(icon_name or 'cloud').lower()
 
@@ -433,6 +450,7 @@ def run_widgets(matrix, payload):
     box_content_y = box_top_y + 2  # 2px below box top.
     line_gap = 6
     date_gap = 2  # Pixel gap between time and date (move date 1px left vs previous).
+    month_day_gap = 1  # Pixel gap between month and day (tighter than a full space).
     todo_word_gap = 2  # Total pixel gap between words.
     # draw_text_todo already leaves a 1px gap after each character; subtract it for spaces.
     todo_space_advance = max(0, todo_word_gap - 1)
@@ -448,8 +466,8 @@ def run_widgets(matrix, payload):
         # Top row: live time + date + weather
         now = datetime.now()
         time_text = f"{now.hour}:{now.minute:02d}"
-        date_text = f"{now.strftime('%b').upper()} {now.day}"
-        short_date = f"{now.strftime('%b').upper()}{now.day}"
+        month_text = now.strftime('%b').upper()
+        day_text = str(now.day)
         time_x = 1
         time_width = drawn_text_width(time_text, 4)
 
@@ -465,30 +483,51 @@ def run_widgets(matrix, payload):
             weather_x = matrix.width - weather_block_width - 1
 
             max_clock_width = weather_x - time_x
-            date_to_draw = ''
-            for option in [date_text, short_date]:
-                option_width = time_width + date_gap + drawn_text_width(option, 4)
+            date_options = [
+                {'gap': month_day_gap, 'day_compact': False},
+                {'gap': 0, 'day_compact': False},
+                {'gap': 0, 'day_compact': True},
+            ]
+            selected_option = None
+            month_width = drawn_text_width(month_text, 4)
+            day_width_normal = drawn_text_width(day_text, 4)
+            day_width_compact = drawn_text_width(day_text, 3)
+            for option in date_options:
+                day_width = day_width_compact if option['day_compact'] else day_width_normal
+                total_date_width = month_width
+                if day_width:
+                    total_date_width += option['gap'] + day_width
+                option_width = time_width + date_gap + total_date_width
                 if option_width <= max_clock_width:
-                    date_to_draw = option
+                    selected_option = option
                     break
 
             draw_text(canvas, time_x, top_row_y, time_text, (255, 242, 194))
-            if date_to_draw:
+            if selected_option:
                 date_x = time_x + time_width + date_gap
-                draw_text(canvas, date_x, top_row_y, date_to_draw, (255, 242, 194))
+                draw_text(canvas, date_x, top_row_y, month_text, (255, 242, 194))
+                day_x = date_x + month_width + selected_option['gap']
+                if selected_option['day_compact']:
+                    draw_text_compact(canvas, day_x, top_row_y, day_text, (255, 242, 194))
+                else:
+                    draw_text(canvas, day_x, top_row_y, day_text, (255, 242, 194))
             icon_x = weather_x + temp_text_width + 1
             draw_text(canvas, weather_x, top_row_y, draw_temp_text, (155, 236, 255))
             draw_weather_icon(canvas, icon_x, top_row_y, icon_name)
         else:
             draw_text(canvas, time_x, top_row_y, time_text, (255, 242, 194))
             date_x = time_x + time_width + date_gap
-            draw_text(canvas, date_x, top_row_y, date_text, (255, 242, 194))
+            draw_text(canvas, date_x, top_row_y, month_text, (255, 242, 194))
+            day_x = date_x + drawn_text_width(month_text, 4) + month_day_gap
+            draw_text(canvas, day_x, top_row_y, day_text, (255, 242, 194))
             draw_text(canvas, matrix.width - text_width('OFF') - 1, top_row_y, 'OFF', muted_color)
 
         # Bottom-left: todo list gets most of the width
         todo_items = todo.get('items', []) if todo.get('enabled', True) else []
         todo_style = todo.get('bulletStyle', 'dot')
-        todo_y = box_content_y
+        todo_y = max(0, box_content_y - 1)
+        todo_text_x = 7
+        todo_max_pixels = max(0, divider_x - todo_text_x)
 
         if not todo.get('enabled', True):
             draw_text(canvas, 1, todo_y, 'OFF', muted_color)
@@ -497,7 +536,8 @@ def run_widgets(matrix, payload):
         else:
             for item in todo_items[:3]:
                 draw_todo_bullet(canvas, 1, todo_y, todo_style)
-                draw_text_todo(canvas, 7, todo_y, fit_text(item.get('text', ''), 10), text_color, todo_space_advance)
+                todo_text = fit_todo_text(item.get('text', ''), todo_max_pixels, todo_space_advance)
+                draw_text_todo(canvas, todo_text_x, todo_y, todo_text, text_color, todo_space_advance)
                 todo_y += line_gap
 
         # Bottom-right: one upcoming calendar event.
