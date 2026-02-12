@@ -124,6 +124,13 @@ function shortDateString(value = new Date()) {
   return `${month} ${value.getDate()}`;
 }
 
+function nowTimeString() {
+  const now = new Date();
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
 function nowClockString() {
   const now = new Date();
   const hours = String(now.getHours());
@@ -494,6 +501,9 @@ function syncStateFromForm() {
   appState.pi.useSudo = ids.piSudo.checked;
 
   appState.board.brightness = Number(ids.brightness.value) || 70;
+  if (appState.board.mode !== 'clock') {
+    appState.board.dayBrightness = appState.board.brightness;
+  }
 
   appState.board.widgets.weather.enabled = ids.weatherEnabled.checked;
   appState.board.widgets.weather.city = ids.weatherCity.value.trim();
@@ -642,6 +652,17 @@ function drawWidgetPreview(width, height) {
   previewCtx.fillText(parts.number || '----', dividerX + 12, height * 0.7);
 }
 
+function drawClockPreview(width, height) {
+  const timeText = nowTimeString();
+  previewCtx.fillStyle = '#000000';
+  previewCtx.fillRect(0, 0, width, height);
+  previewCtx.fillStyle = '#ff5b5b';
+  previewCtx.font = '700 96px Space Grotesk';
+  previewCtx.textAlign = 'center';
+  previewCtx.textBaseline = 'middle';
+  previewCtx.fillText(timeText, width / 2, height / 2);
+}
+
 function drawPreviewLedCell(x, y, sx, sy, color) {
   previewCtx.fillStyle = color;
   previewCtx.fillRect(Math.floor(x * sx), Math.floor(y * sy), Math.ceil(sx), Math.ceil(sy));
@@ -780,6 +801,10 @@ function drawPreview() {
 
   if (activeTab === 'valentine') {
     drawValentinePreview(w, h, sx, sy);
+    return;
+  }
+  if (activeTab === 'clock') {
+    drawClockPreview(w, h);
     return;
   }
 

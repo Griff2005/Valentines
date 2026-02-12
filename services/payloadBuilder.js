@@ -183,6 +183,14 @@ function buildValentinePayload(state) {
   };
 }
 
+function buildClockPayload(state) {
+  return {
+    mode: 'clock',
+    brightness: clampNumber(state.board.brightness, 10, 100, 70),
+    matrixOptions: buildMatrixOptions(state)
+  };
+}
+
 async function buildPayload(state, mode, getWeather) {
   const selectedMode = mode || state.board.mode;
 
@@ -204,6 +212,10 @@ async function buildPayload(state, mode, getWeather) {
 
   if (selectedMode === 'valentine') {
     return buildValentinePayload(state);
+  }
+
+  if (selectedMode === 'clock') {
+    return buildClockPayload(state);
   }
 
   throw new Error(`Unsupported board mode: ${selectedMode}`);

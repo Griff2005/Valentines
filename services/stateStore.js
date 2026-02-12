@@ -147,6 +147,17 @@ function normalizeState(inputState) {
   const merged = deepMerge(defaultState, inputState || {});
   merged.board.width = 64;
   merged.board.height = 32;
+  merged.board.brightness = clampInteger(merged.board.brightness, 10, 100, 70);
+  merged.board.dayBrightness = clampInteger(
+    merged.board.dayBrightness,
+    10,
+    100,
+    merged.board.brightness
+  );
+  merged.board.autoSchedule = {
+    lastNight: sanitizeDate(merged.board.autoSchedule?.lastNight, ''),
+    lastDay: sanitizeDate(merged.board.autoSchedule?.lastDay, '')
+  };
 
   merged.board.pixels.data = sanitizePixels(
     merged.board.pixels.data,

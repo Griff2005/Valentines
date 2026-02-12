@@ -149,6 +149,31 @@ def draw_text(canvas, x, y, text, color):
         cursor += 4
 
 
+def draw_char_scaled(canvas, x, y, char, color, scale=2):
+    glyph = FONT_3X5.get(char.upper(), FONT_3X5[' '])
+    for row_index, row in enumerate(glyph):
+        for col_index, bit in enumerate(row):
+            if bit != '1':
+                continue
+            for dy in range(scale):
+                for dx in range(scale):
+                    draw_pixel(canvas, x + col_index * scale + dx, y + row_index * scale + dy, color)
+
+
+def draw_text_scaled(canvas, x, y, text, color, scale=2, gap=1):
+    cursor = x
+    for char in text:
+        draw_char_scaled(canvas, cursor, y, char, color, scale)
+        cursor += 3 * scale + gap
+
+
+def scaled_text_width(text, scale=2, gap=1):
+    raw = str(text or '')
+    if not raw:
+        return 0
+    return len(raw) * (3 * scale) + (len(raw) - 1) * gap
+
+
 def draw_text_todo(canvas, x, y, text, color, space_advance=1):
     cursor = x
     for char in str(text or ''):
@@ -485,8 +510,8 @@ def run_widgets(matrix, payload):
             max_clock_width = weather_x - time_x
             date_options = [
                 {'gap': month_day_gap, 'day_compact': False},
-                {'gap': 0, 'day_compact': False},
-                {'gap': 0, 'day_compact': True},
+                {'gap': 1, 'day_compact': False},
+                {'gap': 1, 'day_compact': True},
             ]
             selected_option = None
             month_width = drawn_text_width(month_text, 4)
@@ -557,6 +582,29 @@ def run_widgets(matrix, payload):
 
         canvas = matrix.SwapOnVSync(canvas)
         time.sleep(0.25)
+
+
+def run_clock(matrix, payload):
+    scale = 3
+    gap = 1
+    color = (255, 90, 90)
+
+    canvas = matrix.CreateFrameCanvas()
+
+    while RUNNING:
+        clear(canvas)
+
+        now = datetime.now()
+        time_text = f"{now.hour:02d}:{now.minute:02d}"
+        text_width = scaled_text_width(time_text, scale, gap)
+        text_height = 5 * scale
+        text_x = max(0, (matrix.width - text_width) // 2)
+        text_y = max(0, (matrix.height - text_height) // 2)
+
+        draw_text_scaled(canvas, text_x, text_y, time_text, color, scale, gap)
+
+        canvas = matrix.SwapOnVSync(canvas)
+        time.sleep(0.5)
 
 
 def draw_flower(canvas, x, y):
@@ -846,6 +894,8 @@ def main():
             run_valentine(matrix, payload)
         elif mode == 'animation':
             run_animation(matrix, payload)
+        elif mode == 'clock':
+            run_clock(matrix, payload)
         elif mode == 'pixels':
             run_pixels(matrix, payload)
         else:

@@ -12,7 +12,12 @@ const defaultState = {
     width: WIDTH,
     height: HEIGHT,
     brightness: 70,
+    dayBrightness: 70,
     mode: 'widgets',
+    autoSchedule: {
+      lastNight: '',
+      lastDay: ''
+    },
     widgets: {
       weather: {
         enabled: true,
