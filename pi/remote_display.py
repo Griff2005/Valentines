@@ -250,7 +250,7 @@ def build_matrix(payload):
     options.hardware_mapping = str(options_data.get('hardwareMapping') or 'regular')
     rgb_sequence = str(options_data.get('rgbSequence') or '').upper()
     if rgb_sequence in ('RGB', 'RBG', 'GRB', 'GBR', 'BRG', 'BGR'):
-        options.rgb_sequence = rgb_sequence
+        options.led_rgb_sequence = rgb_sequence
     options.gpio_slowdown = int(clamp(options_data.get('gpioSlowdown'), 0, 8, 4))
     options.disable_hardware_pulsing = bool(options_data.get('noHardwarePulse', True))
     options.pwm_bits = int(clamp(options_data.get('pwmBits'), 1, 11, 11))
