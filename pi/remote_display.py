@@ -502,17 +502,18 @@ def run_widgets(matrix, payload):
 
         # Bottom-right: one upcoming calendar event.
         panel_x = divider_x + 2
+        calendar_y = max(0, box_content_y - 1)
         if not calendar.get('enabled', True):
-            draw_text_compact(canvas, panel_x, box_content_y, 'OFF', muted_color)
+            draw_text_compact(canvas, panel_x, calendar_y, 'OFF', muted_color)
         else:
             event = next_upcoming_event(calendar.get('events', []))
             if not event:
-                draw_text_compact(canvas, panel_x, box_content_y, 'FREE', muted_color)
+                draw_text_compact(canvas, panel_x, calendar_y, 'FREE', muted_color)
             else:
-                draw_text_compact(canvas, panel_x, box_content_y, event['time'], text_color)
+                draw_text_compact(canvas, panel_x, calendar_y, event['time'], text_color)
                 program, number = split_course_parts(event['title'], 4, 4)
-                draw_text(canvas, panel_x, box_content_y + line_gap, program or 'CLAS', text_color)
-                draw_text(canvas, panel_x, box_content_y + (2 * line_gap), number or '----', text_color)
+                draw_text(canvas, panel_x, calendar_y + line_gap, program or 'CLAS', text_color)
+                draw_text(canvas, panel_x, calendar_y + (2 * line_gap), number or '----', text_color)
 
         canvas = matrix.SwapOnVSync(canvas)
         time.sleep(0.25)
